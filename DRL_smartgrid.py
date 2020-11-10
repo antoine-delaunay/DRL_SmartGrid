@@ -213,7 +213,7 @@ def train_step(model, transitions_batch):
 env = Env()
 env.initState()
 
-nb_episodes = 10
+nb_episodes = 100
 nb_steps = 10
 batch_size = 10
 
