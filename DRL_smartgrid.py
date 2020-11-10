@@ -40,8 +40,8 @@ class Env:
 
         # Prétraitement des données
         # TODO: transformer daytime en float
-        self.panelProdMax = max(self.data[:, 3])
-        self.consumptionMax = max(self.data[:, 5])
+        self.panelProdMax = max(self.data[:, 5])
+        self.consumptionMax = max(self.data[:, 4])
 
         self.data[:, 5] /= self.panelProdMax
         self.data[:, 4] /= self.consumptionMax
