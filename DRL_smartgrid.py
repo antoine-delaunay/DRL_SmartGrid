@@ -210,51 +210,95 @@ def train_step(model, transitions_batch):
     return disc_loss
 
 
-env = Env()
-env.initState()
+"""
+Models supported :
+    - DQN
+    - Random
 
-nb_episodes = 100
-nb_steps = 10
-batch_size = 10
 
-DQN_model = DQN(n_neurons=10, input_size=10)
+"""
 
-optimizer = tf.keras.optimizers.Adam(learning_rate=1e-4)
 
-state = env.currentState
+def test(model_used = "DQN", seed = 1234):
 
-replay_memory = []
-replay_memory_init_size = 100
-
-for i in range(replay_memory_init_size):
-    action_probs = policy(DQN_model, state)
-    action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
-    reward, next_state = env.act(action)
-    replay_memory.append((state, action, reward, next_state))
-    state = next_state
-
-loss_hist = []
-
-for i_episode in range(nb_episodes):
+    np.random.seed(seed)
+    env = Env()
     env.initState()
-    state = env.currentState
-    loss_episode = 0.0
-    # print(i_episode)
 
-    for step in range(nb_steps):
-        action_probs = policy(DQN_model, state)
+    nb_episodes = 100
+    nb_steps = 10
+    batch_size = 10
+
+    if model_used == "DQN":
+
+        DQN_model = DQN(n_neurons=10, input_size=10)
+
+        optimizer = tf.keras.optimizers.Adam(learning_rate=1e-4)
+
+    state = env.currentState
+
+    replay_memory = []
+    replay_memory_init_size = 100
+
+    for i in range(replay_memory_init_size):
+        if model_used == "DQN":
+            action_probs = policy(DQN_model, state)
+        if model_used == "Random":
+            action_probs = np.array( [1/NB_ACTION] * NB_ACTION )
         action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
         reward, next_state = env.act(action)
-
-        replay_memory.pop(0)
         replay_memory.append((state, action, reward, next_state))
-
-        samples = random.sample(replay_memory, batch_size)
-
-        loss_episode += train_step(DQN_model, samples)
         state = next_state
 
-    loss_hist.append(loss_episode)
+    loss_hist = []
 
-plt.plot(loss_hist)
-plt.show()
+    for i_episode in range(nb_episodes):
+        env.initState()
+        state = env.currentState
+        loss_episode = 0.0
+        # print(i_episode)
+
+        for step in range(nb_steps):
+            if model_used == "DQN":
+                action_probs = policy(DQN_model, state)
+            if model_used == "Random":
+                action_probs = np.array( [1/NB_ACTION] * NB_ACTION )
+            action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
+            reward, next_state = env.act(action)
+
+            replay_memory.pop(0)
+            replay_memory.append((state, action, reward, next_state))
+
+            if model_used == "DQN":
+                samples = random.sample(replay_memory, batch_size)
+                loss_episode += train_step(DQN_model, samples)
+            
+            state = next_state
+
+        loss_hist.append(loss_episode)
+
+    return(loss_hist)
+
+
+
+if __name__ == "__main__":
+    
+    print("Simulating DQN1...")
+    lossDQN1 = test()
+    print("DQN1 done\n")
+    print("Simulating DQN2...")
+    lossDQN2 = test()
+    print("DQN2 done\n")
+
+    print("Test fixing seed okay : " , loss1 == loss2)
+
+    print("\nSimulating Random...")
+    lossRandom = test(model_used = "Random")
+    print("Random done\n")
+
+    fig, ax = plt.subplots()
+    plt.plot(lossDQN1, fig = fig, ax = ax)
+    plt.plot(lossRandom, fig = fig, ax = ax)
+    ax.legend(["DQN", "Random"])
+
+
