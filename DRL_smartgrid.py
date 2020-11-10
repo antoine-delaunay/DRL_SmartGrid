@@ -198,7 +198,7 @@ def loss(model, transitions_batch):
     return tf.reduce_mean(tf.square(q - tf.stop_gradient(y)), name="loss_mse_train")
 
 
-def train_step(model, transitions_batch):
+def train_step(model, transitions_batch, optimizer):
     # batch_size = transitions_batch.shape[0]
 
     with tf.GradientTape() as disc_tape:
@@ -208,6 +208,7 @@ def train_step(model, transitions_batch):
 
     optimizer.apply_gradients(zip(gradients, model.trainable_variables))
     return disc_loss
+
 
 
 """
@@ -251,6 +252,7 @@ def test(model_used = "DQN", seed = 1234):
         state = next_state
 
     loss_hist = []
+    cost_hist = []
 
     for i_episode in range(nb_episodes):
         env.initState()
@@ -269,36 +271,64 @@ def test(model_used = "DQN", seed = 1234):
             replay_memory.pop(0)
             replay_memory.append((state, action, reward, next_state))
 
+            cost_hist.append(-reward)
+
             if model_used == "DQN":
                 samples = random.sample(replay_memory, batch_size)
-                loss_episode += train_step(DQN_model, samples)
-            
+                loss_episode += train_step(DQN_model, samples, optimizer)
+
             state = next_state
 
         loss_hist.append(loss_episode)
 
-    return(loss_hist)
+    return(loss_hist,cost_hist)
+
+
+def integrate(serie_temp):
+    serie_int = [serie_temp[0]]
+    for i in range(1,len(serie_temp)):
+        serie_int.append( serie_int[-1] + serie_temp[i] )
+    return(serie_int)
 
 
 
 if __name__ == "__main__":
     
+    
     print("Simulating DQN1...")
-    lossDQN1 = test()
+    lossDQN1, costDQN1 = test(model_used = "DQN")
     print("DQN1 done\n")
-    print("Simulating DQN2...")
-    lossDQN2 = test()
-    print("DQN2 done\n")
 
-    print("Test fixing seed okay : " , loss1 == loss2)
+    # print("Simulating DQN2...")
+    # lossDQN2 = test()
+    # print("DQN2 done\n")
+
+    # print("Test fixing seed okay : " , lossDQN1 == lossDQN2)
+    
 
     print("\nSimulating Random...")
-    lossRandom = test(model_used = "Random")
+    lossRandom1, costRandom1 = test(model_used = "Random")
     print("Random done\n")
 
+    # print("\nSimulating Random...")
+    # lossRandom2 = test(model_used = "Random")
+    # print("Random done\n")
+
+    # print("Test fixing seed okay : " , lossRandom1 == lossRandom2)
+
+    cumulated_costRandom1 = integrate(costRandom1)
+    cumulated_costDQN1 = integrate(costDQN1)
+
+    print(len(cumulated_costDQN1), cumulated_costDQN1[:10])
+    print(len(cumulated_costRandom1), cumulated_costRandom1[:10])
+
     fig, ax = plt.subplots()
-    plt.plot(lossDQN1, fig = fig, ax = ax)
-    plt.plot(lossRandom, fig = fig, ax = ax)
+    ax.plot(cumulated_costDQN1)
+    ax.plot(cumulated_costRandom1)
+    
+    
     ax.legend(["DQN", "Random"])
+
+    plt.show()
 
 
