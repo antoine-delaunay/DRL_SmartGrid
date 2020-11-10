@@ -43,8 +43,8 @@ class Env:
         self.panelProdMax = max(self.data[:, 3])
         self.consumptionMax = max(self.data[:, 5])
 
-        self.data[:, 3] /= self.panelProdMax
-        self.data[:, 5] /= self.consumptionMax
+        self.data[:, 5] /= self.panelProdMax
+        self.data[:, 4] /= self.consumptionMax
 
         self.initState()
         self.batteryCapacity = 60000.0 / self.panelProdMax
@@ -73,9 +73,9 @@ class Env:
         )  # Deuxième valeur à modifier en fonction du nombre de steps réalisés par épisode
         row = self.currentState.row
         self.currentState.daytime = self.data[row, 1]
-        self.currentState.panelProd = self.data[row, 3]
-        self.currentState.price = self.data[row, 4]
-        self.currentState.consumption = self.data[row, 5]
+        self.currentState.panelProd = self.data[row, 5]
+        self.currentState.price = self.data[row, 3]
+        self.currentState.consumption = self.data[row, 4]
 
     def act(self, action):
         totalProd = self.currentState.panelProd
@@ -122,9 +122,9 @@ class Env:
         # UPDATE SELF.PANELPROD, PRICE, CONSUMPTION, DAYTIME according to the dataset
         row = self.currentState.row + 1
         self.currentState.daytime = self.data[row, 1]
-        self.currentState.panelProd = self.data[row, 3]
-        self.currentState.price = self.data[row, 4]
-        self.currentState.consumption = self.data[row, 5]
+        self.currentState.panelProd = self.data[row, 5]
+        self.currentState.price = self.data[row, 3]
+        self.currentState.consumption = self.data[row, 4]
         self.currentState.row = row
 
         return -cost, self.currentState
