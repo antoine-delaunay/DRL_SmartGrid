@@ -20,6 +20,11 @@ class State:
         self.price = 0.0
         self.daytime = 0.0
         self.row = 0
+        
+        self.charge = 0.0
+        self.discharge = 0.0
+        self.generate = 0.0
+        self.trade = 0.0
 
     def toArray(self):
         return np.array(
@@ -34,10 +39,7 @@ class Env:
         df = pandas.read_csv("select_data.csv", sep=",", header=0)
 
         self.data = df.values
-        # for i in range(len(self.data)):
-        #     self.data[i,3]=self.data[i,3]*8000
-        # print(self.data[500])
-
+        
         # Prétraitement des données
         # TODO: transformer daytime en float
         self.panelProdMax = max(self.data[:, 5])
@@ -47,26 +49,26 @@ class Env:
         self.data[:, 4] /= self.consumptionMax
         self.data[:, 3] /= 1000.0
 
+        #Capacity of the battery and the generator
         self.initState()
-        self.batteryCapacity = 0.4
-        # self.batteryCapacity = 60000.0 / self.panelProdMax
-        self.generatorCapacity = 0.4  # Energie produite par le générateur en 5min
-        # self.generatorCapacity = 20000.0 / (12 * self.panelProdMax) # Energie produite par le générateur en 5min
+        self.batteryCapacity = 0.4      #60000.0 / self.panelProdMax
+        self.generatorCapacity = 0.4  # Energie produite par le générateur en 5min 20000.0 / (12 * self.panelProdMax)
 
+        #CO2 price/emissions
         self.co2Price = 25.0 * 0.001  # price per ton of CO2 (mean price from the european market)
         self.co2Generator = 8 * 0.001  # kg of CO2 generated per kWh from the diesel generator
-        self.co2Market = (
-            0.3204  # kg of CO2 generated per kWh from the national power market (danish)
-        )
-
+        self.co2Market = 0.3204  # kg of CO2 generated per kWh from the national power market (danish)
+        
+        #Operational costs
         self.chargingCost = 0.0
         self.dischargingCost = 0.0
         # self.solarCost = 0.0
         self.generatorCost = 0.4  # 0.314 à 0.528 $/kWh
 
+        #Yields
         self.chargingYield = 1.0
         self.dischargingYield = 1.0
-
+        
     def initState(self):
         self.currentState = State()
         self.currentState.row = np.random.randint(
@@ -77,45 +79,56 @@ class Env:
         self.currentState.panelProd = self.data[row, 5]
         self.currentState.price = self.data[row, 3]
         self.currentState.consumption = self.data[row, 4]
-
+        
+        
     def act(self, action):
         self.diffProd = self.currentState.panelProd - self.currentState.consumption
         cost = 0.0
+        self.currentState.charge=0.0
+        self.currentState.discharge=0.0
+        self.currentState.generate=0.0
+        self.currentState.trade=0.0
+        
 
         if action == "charge":
+           # print("Charge")
+           # print(self.currentState.battery)
             if self.diffProd > 0:
-                charge = min(
+                self.currentState.charge = min(
                     self.diffProd,
                     (self.batteryCapacity - self.currentState.battery) / self.chargingYield,
                 )
-                self.currentState.battery += charge * self.chargingYield
-                self.diffProd -= charge
-                cost += charge * self.chargingCost
+                self.currentState.battery += self.currentState.charge * self.chargingYield
+                self.diffProd -= self.currentState.charge
+                cost += self.currentState.charge * self.chargingCost
+            #    print(self.currentState.battery)
 
         elif action == "discharge":
             if self.diffProd < 0:
-                discharge = max(self.diffProd / self.dischargingYield, -self.currentState.battery)
-                self.currentState.battery += discharge
-                self.diffProd -= discharge * self.dischargingYield
-                cost += abs(discharge * self.dischargingCost)
+                self.currentState.discharge = max(self.diffProd / self.dischargingYield, -self.currentState.battery)
+                self.currentState.battery +=  self.currentState.discharge
+                self.diffProd -=  self.currentState.discharge * self.dischargingYield
+                cost += abs( self.currentState.discharge * self.dischargingCost)
 
         elif action == "generator":
             if self.diffProd < 0:
-                generate = min(-self.diffProd, self.generatorCapacity)
-                self.diffProd += generate
-                cost += generate * self.generatorCost
+                self.currentState.generate = min(-self.diffProd, self.generatorCapacity)
+                self.diffProd += self.currentState.generate
+                cost += self.currentState.generate * self.generatorCost
 
         elif action == "discharge + generator":
             if self.diffProd < 0:
-                discharge = max(self.diffProd / self.dischargingYield, -self.currentState.battery)
-                self.currentState.battery += discharge
-                self.diffProd -= discharge * self.dischargingYield
-                cost += abs(discharge * self.dischargingCost)
+                self.currentState.discharge = max(self.diffProd / self.dischargingYield, -self.currentState.battery)
+                self.currentState.battery +=  self.currentState.discharge
+                self.diffProd -=  self.currentState.discharge * self.dischargingYield
+                cost += abs( self.currentState.discharge * self.dischargingCost)
 
             if self.diffProd < 0:
-                generate = min(-self.diffProd, self.generatorCapacity)
-                self.diffProd += generate
-                cost += generate * self.generatorCost
+                self.currentState.generate = min(-self.diffProd, self.generatorCapacity)
+                self.diffProd += self.currentState.generate
+                cost += self.currentState.generate * self.generatorCost
+                
+        self.currentState.trade=-self.diffProd
 
         cost -= self.diffProd * self.currentState.price
 
@@ -131,6 +144,10 @@ class Env:
 
     def getState(self):
         return self.currentState
+
+
+
+#Algorithme DQN
 
 
 def DQN(n_neurons, input_size):
@@ -219,13 +236,9 @@ Models supported :
 """
 
 
-def test(model_used="DQN", seed=1234):
+def train(model_used="DQN"):
 
-    np.random.seed(seed)
-    env = Env()
-    env.initState()
-
-    nb_episodes = 100
+    nb_episodes = 1000
     nb_steps = 10
     batch_size = 10
 
@@ -235,40 +248,39 @@ def test(model_used="DQN", seed=1234):
 
         optimizer = tf.keras.optimizers.Adam(learning_rate=1e-4)
 
-    state = env.currentState
-
+   
     replay_memory = []
     replay_memory_init_size = 100
 
     for i in range(replay_memory_init_size):
         if model_used == "DQN":
-            action_probs = policy(DQN_model, state)
+            action_probs = policy(DQN_model, env.currentState)
         if model_used == "Random":
             action_probs = np.array([1 / NB_ACTION] * NB_ACTION)
         action = np.random.choice(ACTIONS, p=action_probs)
         reward, next_state = env.act(action)
-        replay_memory.append((state, action, reward, next_state))
-        state = next_state
+        replay_memory.append((env.currentState, action, reward, next_state))
+        env.currentState = next_state
 
     loss_hist = []
     cost_hist = []
 
     for i_episode in range(nb_episodes):
         env.initState()
-        state = env.currentState
         loss_episode = 0.0
-        # print(i_episode)
+        if i_episode%10 ==0:
+            print(i_episode)
 
         for step in range(nb_steps):
             if model_used == "DQN":
-                action_probs = policy(DQN_model, state)
+                action_probs = policy(DQN_model, env.currentState)
             if model_used == "Random":
                 action_probs = np.array([1 / NB_ACTION] * NB_ACTION)
             action = np.random.choice(ACTIONS, p=action_probs)
             reward, next_state = env.act(action)
 
             replay_memory.pop(0)
-            replay_memory.append((state, action, reward, next_state))
+            replay_memory.append((env.currentState, action, reward, next_state))
 
             cost_hist.append(-reward)
 
@@ -276,12 +288,15 @@ def test(model_used="DQN", seed=1234):
                 samples = random.sample(replay_memory, batch_size)
                 loss_episode += train_step(DQN_model, samples, optimizer)
 
-            state = next_state
+            env.currentState = next_state
 
         loss_hist.append(loss_episode)
-
-    return (loss_hist, cost_hist)
-
+        
+    if model_used=="DQN":
+        return (loss_hist, cost_hist,DQN_model)
+    if model_used=="Random":
+        return (loss_hist,cost_hist,None)
+    
 
 def integrate(serie_temp):
     serie_int = [serie_temp[0]]
@@ -291,9 +306,12 @@ def integrate(serie_temp):
 
 
 if __name__ == "__main__":
-
+    np.random.seed(1234)
+    env = Env()
+    env.initState()
+    
     print("Simulating DQN1...")
-    lossDQN1, costDQN1 = test(model_used="DQN")
+    lossDQN1, costDQN1,DQN1 = train(model_used="DQN")
     print("DQN1 done\n")
 
     # print("Simulating DQN2...")
@@ -303,7 +321,7 @@ if __name__ == "__main__":
     # print("Test fixing seed okay : " , lossDQN1 == lossDQN2)
 
     print("\nSimulating Random...")
-    lossRandom1, costRandom1 = test(model_used="Random")
+    lossRandom1, costRandom1,_ = train(model_used="Random")
     print("Random done\n")
 
     # print("\nSimulating Random...")
@@ -326,3 +344,105 @@ if __name__ == "__main__":
 
     plt.show()
 
+def test(DQN_model=DQN1):
+    consoDQN,prodDQN,priceDQN = [], [], []
+    actionsDQN, costDQN = [], []
+    batteryDQN, chargeDQN, dischargeDQN, generateDQN, tradeDQN = [], [], [], [], []
+     
+    env.initState()
+    initState=env.currentState
+    print(env.currentState.daytime)
+    
+    #DQN
+    for i in range(300):
+        action_probs = policy(DQN_model, env.currentState)
+        action = np.random.choice(ACTIONS, p=action_probs)
+        reward, next_state = env.act(action)
+        
+        consoDQN.append(env.currentState.consumption), 
+        prodDQN.append(env.currentState.panelProd), 
+        priceDQN.append(env.currentState.price)
+        
+        costDQN.append(-reward)
+        actionsDQN.append(action)
+        batteryDQN.append(env.currentState.battery)
+
+        chargeDQN.append(env.currentState.charge)
+        dischargeDQN.append(env.currentState.discharge)
+        generateDQN.append(env.currentState.generate)
+        tradeDQN.append(env.currentState.trade)
+        
+        env.currentState = next_state 
+    
+    #Random
+    consoRandom,prodRandom,priceRandom = [], [], []
+    actionsRandom, costRandom = [], []
+    batteryRandom, chargeRandom, dischargeRandom, generateRandom, tradeRandom = [], [], [], [], []
+    
+    
+    env.currentState=initState
+    for i in range(300):
+        action_probs = policy(DQN_model, env.currentState)
+        action = np.random.choice(ACTIONS, p=action_probs)
+        reward, next_state = env.act(action)
+        
+        consoRandom.append(env.currentState.consumption), 
+        prodRandom.append(env.currentState.panelProd), 
+        priceRandom.append(env.currentState.price)
+        
+        costRandom.append(-reward)
+        actionsRandom.append(action)
+        batteryRandom.append(env.currentState.battery)
+
+        chargeRandom.append(env.currentState.charge)
+        dischargeRandom.append(env.currentState.discharge)
+        generateRandom.append(env.currentState.generate)
+        tradeRandom.append(env.currentState.trade)
+        
+        env.currentState = next_state 
+        #    print(i)
+    
+    fig1,ax1 = plt.subplots()
+    ax1.plot(tradeDQN)
+    ax1.plot(generateDQN)
+    ax1.plot(batteryDQN)
+    ax1.legend(["TradeDQN", "GeneratorDQN", "BatteryDQN"])
+
+    plt.show()
+    fig2,ax2 =plt.subplots()
+    ax2.plot(actionsDQN)
+    ax2.legend(["ActionsDQN"])
+    plt.show()
+    
+    fig3,ax3 = plt.subplots()
+    ax3.plot(consoDQN)
+    ax3.plot(prodDQN)
+    ax3.plot(batteryDQN)
+    ax3.legend(["ConsumptionDQN", "ProductionDQN", "BatteryDQN"])
+    plt.show()
+
+    fig4, ax4 = plt.subplots()
+    ax4.plot(tradeRandom)
+    ax4.plot(generateRandom)
+    ax4.plot(batteryRandom)
+    ax4.legend(["TradeRandom", "GeneratorRandom", "BatteryRandom"])
+
+    plt.show()
+    
+    fig5,ax5 =plt.subplots()
+    ax5.plot(actionsRandom)
+    ax5.legend(["ActionsRandom"])
+    plt.show()
+    
+    fig6,ax6 = plt.subplots()
+    ax6.plot(consoRandom)
+    ax6.plot(prodRandom)
+    ax6.plot(batteryRandom)
+    ax6.legend(["ConsumptionRandom", "ProductionRandom", "BatteryRandom"])
+    plt.show()
+    
+    fig7,ax7 = plt.subplots()
+    ax7.plot(np.cumsum(costDQN))
+    ax7.plot(np.cumsum(costRandom))
+    ax7.legend(["CostDQN","CostRandom"])
+    plt.show()
