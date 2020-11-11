@@ -381,8 +381,8 @@ def test(DQN_model=DQN1):
     
     
     env.currentState=initState
-    for i in range(300):
-        action_probs = policy(DQN_model, env.currentState)
+    for i in range(300):        
+        action_probs = np.array([1 / NB_ACTION] * NB_ACTION)
         action = np.random.choice(ACTIONS, p=action_probs)
         reward, next_state = env.act(action)
         
