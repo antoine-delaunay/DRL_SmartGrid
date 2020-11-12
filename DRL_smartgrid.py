@@ -344,14 +344,14 @@ def test(env: Env, DQN_model):
         axs[i].plot(battery[s])
         axs[i].legend(["Trade", "Generator", "Battery"])
         axs[i].title.set_text(s)
-    plt.show()
+    plt.figure(1)
 
     fig, axs = plt.subplots(len(STRATEGIES))
     for i, s in enumerate(STRATEGIES):
         axs[i].plot(actions[s])
         axs[i].legend(["Actions"])
         axs[i].title.set_text(s)
-    plt.show()
+    plt.figure(2)
 
     fig, axs = plt.subplots(len(STRATEGIES))
     for i, s in enumerate(STRATEGIES):
@@ -360,13 +360,15 @@ def test(env: Env, DQN_model):
         axs[i].plot(battery[s])
         axs[i].legend(["Consumption", "Production", "Battery"])
         axs[i].title.set_text(s)
-    plt.show()
+    plt.figure(3)
 
     fig, ax = plt.subplots()
     for s in STRATEGIES:
         ax.plot(np.cumsum(cost[s]))
     ax.legend(STRATEGIES)
     ax.title.set_text("Cost")
+    plt.figure(4)
+
     plt.show()
 
 
