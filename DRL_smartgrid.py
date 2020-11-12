@@ -5,10 +5,11 @@ from tensorflow.keras.utils import plot_model
 import random
 import matplotlib.pyplot as plt
 import numpy as np
+import copy
 
 ACTIONS = ["charge", "discharge", "generator", "discharge + generator", "nothing"]
 NB_ACTION = len(ACTIONS)
-EPS = 5e-2
+EPS = 0.5
 GAMMA = 1.0
 
 
@@ -93,8 +94,6 @@ class Env:
         self.currentState.trade = 0.0
 
         if action == "charge":
-            # print("Charge")
-            # print(self.currentState.battery)
             if self.diffProd > 0:
                 self.currentState.charge = min(
                     self.diffProd,
@@ -103,7 +102,6 @@ class Env:
                 self.currentState.battery += self.currentState.charge * self.chargingYield
                 self.diffProd -= self.currentState.charge
                 cost += self.currentState.charge * self.chargingCost
-            #    print(self.currentState.battery)
 
         elif action == "discharge":
             if self.diffProd < 0:
@@ -152,9 +150,6 @@ class Env:
         return self.currentState
 
 
-# Algorithme DQN
-
-
 def DQN(n_neurons, input_size):
     model = tf.keras.Sequential(name="DQN")
     model.add(
@@ -193,12 +188,7 @@ def predict(model, state, action):
     else:
         input_model[4] = 1.0
 
-    # print(action)
-    # print(input_model)
-    res = model(np.array([input_model]))
-
-    # print(input_model, res)
-    return res
+    return model(np.array([input_model]))
 
 
 def policy(model, state):
@@ -221,8 +211,6 @@ def loss(model, transitions_batch):
 
 
 def train_step(model, transitions_batch, optimizer):
-    # batch_size = transitions_batch.shape[0]
-
     with tf.GradientTape() as disc_tape:
         disc_loss = loss(model, transitions_batch)
 
@@ -232,44 +220,22 @@ def train_step(model, transitions_batch, optimizer):
     return disc_loss
 
 
-"""
-Models supported :
-    - DQN
-    - Random
-    - Nothing
+def train(env: Env, nb_episodes=100, nb_steps=10, batch_size=10):
+    DQN_model = DQN(n_neurons=10, input_size=10)
 
-"""
-
-
-def train(model_used="DQN"):
-
-    nb_episodes = 100
-    nb_steps = 10
-    batch_size = 10
-
-    if model_used == "DQN":
-
-        DQN_model = DQN(n_neurons=10, input_size=10)
-
-        optimizer = tf.keras.optimizers.Adam(learning_rate=1e-4)
+    optimizer = tf.keras.optimizers.Adam(learning_rate=1e-4)
 
     replay_memory = []
     replay_memory_init_size = 100
 
+    env.initState()
     for i in range(replay_memory_init_size):
-        if model_used == "DQN":
-            action_probs = policy(DQN_model, env.currentState)
-        if model_used == "Random":
-            action_probs = np.array([1 / NB_ACTION] * NB_ACTION)
-        if model_used == "Nothing":
-            action_probs = np.array([0.0] * (NB_ACTION - 1) + [1.0])
+        action_probs = policy(DQN_model, env.currentState)
         action = np.random.choice(ACTIONS, p=action_probs)
         reward, next_state = env.act(action)
         replay_memory.append((env.currentState, action, reward, next_state))
-        env.currentState = next_state
 
     loss_hist = []
-    cost_hist = []
 
     for i_episode in range(nb_episodes):
         env.initState()
@@ -278,185 +244,138 @@ def train(model_used="DQN"):
             print(i_episode)
 
         for step in range(nb_steps):
-            if model_used == "DQN":
-                action_probs = policy(DQN_model, env.currentState)
-            if model_used == "Random":
-                action_probs = np.array([1 / NB_ACTION] * NB_ACTION)
-            if model_used == "Nothing":
-                action_probs = np.array([0.0] * (NB_ACTION - 1) + [1.0])
+            action_probs = policy(DQN_model, env.currentState)
             action = np.random.choice(ACTIONS, p=action_probs)
             reward, next_state = env.act(action)
 
             replay_memory.pop(0)
             replay_memory.append((env.currentState, action, reward, next_state))
 
-            cost_hist.append(-reward)
-
-            if model_used == "DQN":
-                samples = random.sample(replay_memory, batch_size)
-                loss_episode += train_step(DQN_model, samples, optimizer)
-
-            env.currentState = next_state
+            samples = random.sample(replay_memory, batch_size)
+            loss_episode += train_step(DQN_model, samples, optimizer)
 
         loss_hist.append(loss_episode)
 
-    if model_used == "DQN":
-        return (loss_hist, cost_hist, DQN_model)
-    if model_used == "Random":
-        return (loss_hist, cost_hist, None)
-    if model_used == "Nothing":
-        return (loss_hist, cost_hist, None)
+    return (loss_hist, DQN_model)
 
 
-def test(DQN_model):
-    consoDQN, prodDQN, priceDQN = [], [], []
-    actionsDQN, costDQN = [], []
-    batteryDQN, chargeDQN, dischargeDQN, generateDQN, tradeDQN = [], [], [], [], []
+"""
+Strategies supported :
+    - DQN
+    - Random
+    - Nothing
+    - RandomBattery    # random charge/discharge
+    - SmartBattery
+"""
+STRATEGIES = ["DQN", "Random", "Nothing", "RandomBattery", "SmartBattery"]
 
+
+def strategyAction(strategy, state, DQN_model=None):
+    if strategy == "DQN":
+        # Deterministic
+        q_value = [predict(DQN_model, state, a) for a in ACTIONS]
+        return ACTIONS[np.argmax(q_value)]
+
+        # Stochastic
+        # action_probs = policy(DQN_model, env.currentState)
+        # return np.random.choice(ACTIONS, p=action_probs)
+
+    if strategy == "Random":
+        return np.random.choice(ACTIONS)
+
+    if strategy == "Nothing":
+        return ACTIONS[-1]
+
+    if strategy == "RandomBattery":
+        return np.random.choice(ACTIONS[0:2])
+
+    if strategy == "SmartBattery":
+        if state.panelProd > state.consumption:
+            return ACTIONS[0]
+        else:
+            return ACTIONS[1]
+
+
+def test(env: Env, DQN_model):
     env.initState()
-    initState = env.currentState
+    initState = copy.deepcopy(env.currentState)
     print(env.currentState.daytime)
 
-    # DQN
-    for i in range(300):
-        action_probs = policy(DQN_model, env.currentState)
-        action = np.random.choice(ACTIONS, p=action_probs)
-        reward, next_state = env.act(action)
+    conso, prod, price = {}, {}, {}
+    actions, cost = {}, {}
+    battery, charge, discharge, generate, trade = {}, {}, {}, {}, {}
 
-        consoDQN.append(env.currentState.consumption),
-        prodDQN.append(env.currentState.panelProd),
-        priceDQN.append(env.currentState.price)
+    for strategy in STRATEGIES:
+        conso[strategy], prod[strategy], price[strategy] = [], [], []
+        actions[strategy], cost[strategy] = [], []
+        (
+            battery[strategy],
+            charge[strategy],
+            discharge[strategy],
+            generate[strategy],
+            trade[strategy],
+        ) = ([], [], [], [], [])
 
-        costDQN.append(-reward)
-        actionsDQN.append(action)
-        batteryDQN.append(env.currentState.battery)
+        env.currentState = copy.deepcopy(initState)
 
-        chargeDQN.append(env.currentState.charge)
-        dischargeDQN.append(env.currentState.discharge)
-        generateDQN.append(env.currentState.generate)
-        tradeDQN.append(env.currentState.trade)
+        for i in range(300):
+            if strategy == "DQN":
+                action = strategyAction(strategy, env.currentState, DQN_model)
+            else:
+                action = strategyAction(strategy, env.currentState)
+            reward, next_state = env.act(action)
 
-        env.currentState = next_state
+            conso[strategy].append(env.currentState.consumption),
+            prod[strategy].append(env.currentState.panelProd),
+            price[strategy].append(env.currentState.price)
 
-    # Random
-    consoRandom, prodRandom, priceRandom = [], [], []
-    actionsRandom, costRandom = [], []
-    batteryRandom, chargeRandom, dischargeRandom, generateRandom, tradeRandom = [], [], [], [], []
+            cost[strategy].append(-reward)
+            actions[strategy].append(action)
+            battery[strategy].append(env.currentState.battery)
 
-    env.currentState = initState
-    for i in range(300):
-        action_probs = np.array([1 / NB_ACTION] * NB_ACTION)
-        action = np.random.choice(ACTIONS, p=action_probs)
-        reward, next_state = env.act(action)
+            charge[strategy].append(env.currentState.charge)
+            discharge[strategy].append(env.currentState.discharge)
+            generate[strategy].append(env.currentState.generate)
+            trade[strategy].append(env.currentState.trade)
 
-        consoRandom.append(env.currentState.consumption),
-        prodRandom.append(env.currentState.panelProd),
-        priceRandom.append(env.currentState.price)
-
-        costRandom.append(-reward)
-        actionsRandom.append(action)
-        batteryRandom.append(env.currentState.battery)
-
-        chargeRandom.append(env.currentState.charge)
-        dischargeRandom.append(env.currentState.discharge)
-        generateRandom.append(env.currentState.generate)
-        tradeRandom.append(env.currentState.trade)
-
-        env.currentState = next_state
-        #    print(i)
-
-    fig1, ax1 = plt.subplots()
-    ax1.plot(tradeDQN)
-    ax1.plot(generateDQN)
-    ax1.plot(batteryDQN)
-    ax1.legend(["TradeDQN", "GeneratorDQN", "BatteryDQN"])
-
-    plt.show()
-    fig2, ax2 = plt.subplots()
-    ax2.plot(actionsDQN)
-    ax2.legend(["ActionsDQN"])
+    fig, axs = plt.subplots(len(STRATEGIES))
+    for i, s in enumerate(STRATEGIES):
+        axs[i].plot(trade[s])
+        axs[i].plot(generate[s])
+        axs[i].plot(battery[s])
+        axs[i].legend(["Trade", "Generator", "Battery"])
+        axs[i].title.set_text(s)
     plt.show()
 
-    fig3, ax3 = plt.subplots()
-    ax3.plot(consoDQN)
-    ax3.plot(prodDQN)
-    ax3.plot(batteryDQN)
-    ax3.legend(["ConsumptionDQN", "ProductionDQN", "BatteryDQN"])
+    fig, axs = plt.subplots(len(STRATEGIES))
+    for i, s in enumerate(STRATEGIES):
+        axs[i].plot(actions[s])
+        axs[i].legend(["Actions"])
+        axs[i].title.set_text(s)
     plt.show()
 
-    fig4, ax4 = plt.subplots()
-    ax4.plot(tradeRandom)
-    ax4.plot(generateRandom)
-    ax4.plot(batteryRandom)
-    ax4.legend(["TradeRandom", "GeneratorRandom", "BatteryRandom"])
-
+    fig, axs = plt.subplots(len(STRATEGIES))
+    for i, s in enumerate(STRATEGIES):
+        axs[i].plot(conso[s])
+        axs[i].plot(prod[s])
+        axs[i].plot(battery[s])
+        axs[i].legend(["Consumption", "Production", "Battery"])
+        axs[i].title.set_text(s)
     plt.show()
 
-    fig5, ax5 = plt.subplots()
-    ax5.plot(actionsRandom)
-    ax5.legend(["ActionsRandom"])
+    fig, ax = plt.subplots()
+    for s in STRATEGIES:
+        ax.plot(np.cumsum(cost[s]))
+    ax.legend(STRATEGIES)
+    ax.title.set_text("Cost")
     plt.show()
-
-    fig6, ax6 = plt.subplots()
-    ax6.plot(consoRandom)
-    ax6.plot(prodRandom)
-    ax6.plot(batteryRandom)
-    ax6.legend(["ConsumptionRandom", "ProductionRandom", "BatteryRandom"])
-    plt.show()
-
-    fig7, ax7 = plt.subplots()
-    ax7.plot(np.cumsum(costDQN))
-    ax7.plot(np.cumsum(costRandom))
-    ax7.legend(["CostDQN", "CostRandom"])
-    plt.show()
-
-
-def integrate(serie_temp):
-    serie_int = [serie_temp[0]]
-    for i in range(1, len(serie_temp)):
-        serie_int.append(serie_int[-1] + serie_temp[i])
-    return serie_int
 
 
 if __name__ == "__main__":
-    np.random.seed(1234)
     env = Env()
-    env.initState()
 
-    print("Simulating DQN1...")
-    lossDQN1, costDQN1, DQN1 = train(model_used="DQN")
-    print("DQN1 done\n")
+    print("Training...")
+    lossDQN, DQN = train(env)
+    print("Done")
 
-    # print("Simulating DQN2...")
-    # lossDQN2 = test()
-    # print("DQN2 done\n")
-
-    # print("Test fixing seed okay : " , lossDQN1 == lossDQN2)
-
-    print("\nSimulating Random...")
-    lossRandom1, costRandom1, _ = train(model_used="Random")
-    print("Random done\n")
-
-    # print("\nSimulating Random...")
-    # lossRandom2 = test(model_used = "Random")
-    # print("Random done\n")
-
-    # print("Test fixing seed okay : " , lossRandom1 == lossRandom2)
-
-    print("\nSimulating Nothing...")
-    lossNothing, costNothing, _ = train(model_used="Nothing")
-    print("Nothing done\n")
-
-    cumulated_costDQN1 = integrate(costDQN1)
-    cumulated_costRandom1 = integrate(costRandom1)
-    cumulated_costNothing = integrate(costNothing)
-
-    fig, ax = plt.subplots()
-    ax.plot(cumulated_costDQN1)
-    ax.plot(cumulated_costRandom1)
-    ax.plot(cumulated_costNothing)
-
-    ax.legend(["DQN", "Random", "Nothing"])
-
-    plt.show()
-
+    test(env, DQN)
