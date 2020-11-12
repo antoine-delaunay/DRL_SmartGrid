@@ -34,10 +34,9 @@ class State:
 
 
 class Env:
-    def __init__(self):
+    def __init__(self, dataFile: str):
         # load data (csv)
-        # importation données
-        df = pandas.read_csv("select_data.csv", sep=",", header=0)
+        df = pandas.read_csv(dataFile, sep=";", header=0)
 
         self.data = df.values
 
@@ -372,10 +371,11 @@ def test(env: Env, DQN_model):
 
 
 if __name__ == "__main__":
-    env = Env()
+    envTrain = Env("select_train_data.csv")
+    envTest = Env("select_test_data.csv")
 
     print("Training...")
-    lossDQN, DQN = train(env)
+    lossDQN, DQN = train(envTrain)
     print("Done")
 
-    test(env, DQN)
+    test(envTest, DQN)
