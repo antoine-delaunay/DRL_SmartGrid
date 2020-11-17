@@ -6,6 +6,7 @@ import random
 import matplotlib.pyplot as plt
 import numpy as np
 import copy
+import datetime
 
 ACTIONS = ["charge", "discharge", "generator", "discharge + generator", "nothing"]
 NB_ACTION = len(ACTIONS)
@@ -28,9 +29,7 @@ class State:
         self.trade = 0.0
 
     def toArray(self):
-        return np.array(
-            [self.battery, self.panelProd, self.consumption, self.price, 0]
-        )  # self.daytime])
+        return np.array([self.battery, self.panelProd, self.consumption, self.price, self.daytime])
 
 
 class Env:
@@ -39,6 +38,15 @@ class Env:
         df = pandas.read_csv(dataFile, sep=";", header=0)
 
         self.data = df.values
+
+        self.data[:, 1] = [
+            (
+                datetime.datetime.strptime(dateStr.split("+")[0], "%Y-%m-%d %H:%M:%S")
+                - datetime.datetime.strptime(dateStr.split(" ")[0], "%Y-%m-%d")
+            ).total_seconds()
+            / (24 * 60 * 60)
+            for dateStr in self.data[:, 1]
+        ]
 
         # Prétraitement des données
         # TODO: transformer daytime en float
@@ -133,7 +141,10 @@ class Env:
 
         self.currentState.trade = -self.diffProd
 
-        cost -= self.diffProd * self.currentState.price
+        if self.diffProd < 0:
+            cost -= self.diffProd * self.currentState.price
+        else:
+            cost -= self.diffProd * self.currentState.price / 10
 
         # UPDATE SELF.PANELPROD, PRICE, CONSUMPTION, DAYTIME according to the dataset
         row = self.currentState.row + 1
@@ -219,10 +230,10 @@ def train_step(model, transitions_batch, optimizer):
     return disc_loss
 
 
-def train(env: Env, nb_episodes=100, nb_steps=10, batch_size=10):
+def train(env: Env, nb_episodes=50, nb_steps=50, batch_size=10):
     DQN_model = DQN(n_neurons=10, input_size=10)
 
-    optimizer = tf.keras.optimizers.Adam(learning_rate=1e-4)
+    optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3)
 
     replay_memory = []
     replay_memory_init_size = 100
@@ -298,7 +309,6 @@ def strategyAction(strategy, state, DQN_model=None):
 def test(env: Env, DQN_model):
     env.initState()
     initState = copy.deepcopy(env.currentState)
-    print(env.currentState.daytime)
 
     conso, prod, price = {}, {}, {}
     actions, cost = {}, {}
@@ -317,7 +327,7 @@ def test(env: Env, DQN_model):
 
         env.currentState = copy.deepcopy(initState)
 
-        for i in range(300):
+        for i in range(3000):
             if strategy == "DQN":
                 action = strategyAction(strategy, env.currentState, DQN_model)
             else:
@@ -358,6 +368,7 @@ def test(env: Env, DQN_model):
         axs[i].plot(conso[s])
         axs[i].plot(prod[s])
         axs[i].plot(battery[s])
+        axs[i].plot(price[s])
         axs[i].legend(["Consumption", "Production", "Battery"])
         axs[i].title.set_text(s)
     plt.figure(3)
@@ -373,8 +384,8 @@ def test(env: Env, DQN_model):
 
 
 if __name__ == "__main__":
-    envTrain = Env("select_train_data.csv")
-    envTest = Env("select_test_data.csv")
+    envTrain = Env("select_train_data_30m.csv")
+    envTest = Env("select_test_data_30m.csv")
 
     print("Training...")
     lossDQN, DQN = train(envTrain)
