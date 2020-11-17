@@ -1,7 +1,9 @@
+import numpy as np
 import matplotlib.pyplot as plt
+import copy
 
-from Env import *
-from Model import *
+from Env import Env, ACTIONS
+from Model import predict
 
 """
 Strategies supported :
@@ -16,6 +18,10 @@ STRATEGIES = ["DQN", "Random", "Nothing", "RandomBattery", "SmartBattery"]
 
 def strategyAction(strategy, state, DQN_model=None):
     if strategy == "DQN":
+        if DQN_model is None:
+            print("No DQN model given in the function strategyAction")
+            return ACTIONS[0]
+
         # Deterministic
         q_value = [predict(DQN_model, state, a) for a in ACTIONS]
         return ACTIONS[np.argmax(q_value)]
@@ -40,16 +46,28 @@ def strategyAction(strategy, state, DQN_model=None):
             return ACTIONS[1]
 
 
-def test(env: Env, DQN_model):
+def test(env: Env, nb_step=3000, DQN_model=None):
     env.initState()
     initState = copy.deepcopy(env.currentState)
 
-    conso, prod, price = {}, {}, {}
+    conso, prod, price = [], [], []
+
+    for i in range(nb_step):
+        env.act(ACTIONS[0])
+
+        conso.append(env.currentState.consumption)
+        prod.append(env.currentState.panelProd)
+        price.append(env.currentState.price)
+
     actions, cost = {}, {}
     battery, charge, discharge, generate, trade = {}, {}, {}, {}, {}
 
-    for strategy in STRATEGIES:
-        conso[strategy], prod[strategy], price[strategy] = [], [], []
+    strategies_list = STRATEGIES[:]
+
+    if DQN_model is None:
+        strategies_list.remove("DQN")
+
+    for strategy in strategies_list:
         actions[strategy], cost[strategy] = [], []
         (
             battery[strategy],
@@ -61,16 +79,12 @@ def test(env: Env, DQN_model):
 
         env.currentState = copy.deepcopy(initState)
 
-        for i in range(3000):
+        for i in range(nb_step):
             if strategy == "DQN":
                 action = strategyAction(strategy, env.currentState, DQN_model)
             else:
                 action = strategyAction(strategy, env.currentState)
             reward, next_state = env.act(action)
-
-            conso[strategy].append(env.currentState.consumption),
-            prod[strategy].append(env.currentState.panelProd),
-            price[strategy].append(env.currentState.price)
 
             cost[strategy].append(-reward)
             actions[strategy].append(action)
@@ -81,36 +95,37 @@ def test(env: Env, DQN_model):
             generate[strategy].append(env.currentState.generate)
             trade[strategy].append(env.currentState.trade)
 
-    fig, axs = plt.subplots(len(STRATEGIES))
-    for i, s in enumerate(STRATEGIES):
+    fig, axs = plt.subplots(len(strategies_list))
+    for i, s in enumerate(strategies_list):
         axs[i].plot(trade[s])
-        axs[i].plot(generate[s])
+        # axs[i].plot(generate[s])
         axs[i].plot(battery[s])
-        axs[i].legend(["Trade", "Generator", "Battery"])
+        # axs[i].legend(["Trade", "Generator", "Battery"])
+        axs[i].legend(["Trade", "Battery"])
         axs[i].title.set_text(s)
     plt.figure(1)
 
-    fig, axs = plt.subplots(len(STRATEGIES))
-    for i, s in enumerate(STRATEGIES):
+    fig, axs = plt.subplots(len(strategies_list))
+
+    for i, s in enumerate(strategies_list):
         axs[i].plot(actions[s])
         axs[i].legend(["Actions"])
         axs[i].title.set_text(s)
     plt.figure(2)
 
-    fig, axs = plt.subplots(len(STRATEGIES))
-    for i, s in enumerate(STRATEGIES):
-        axs[i].plot(conso[s])
-        axs[i].plot(prod[s])
-        axs[i].plot(battery[s])
-        axs[i].plot(price[s])
-        axs[i].legend(["Consumption", "Production", "Battery"])
-        axs[i].title.set_text(s)
+    fig, axs = plt.subplots(2)
+    axs[0].plot(conso)
+    axs[0].plot(prod)
+    axs[1].plot(price)
+    axs[0].legend(["Consumption", "Production"])
+    axs[1].title.set_text("Price")
     plt.figure(3)
 
     fig, ax = plt.subplots()
-    for s in STRATEGIES:
+    for s in strategies_list:
         ax.plot(np.cumsum(cost[s]))
-    ax.legend(STRATEGIES)
+
+    ax.legend(strategies_list)
     ax.title.set_text("Cost")
     plt.figure(4)
 

@@ -1,6 +1,5 @@
 import pandas
 import numpy as np
-import copy
 import datetime
 
 # ACTIONS = ["charge", "discharge", "generator", "discharge + generator", "nothing"]
