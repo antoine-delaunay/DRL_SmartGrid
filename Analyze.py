@@ -1,3 +1,5 @@
+import matplotlib.pyplot as plt
+
 from Env import *
 from Model import *
 

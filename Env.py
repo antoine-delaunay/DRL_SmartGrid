@@ -1,6 +1,4 @@
 import pandas
-import random
-import matplotlib.pyplot as plt
 import numpy as np
 import copy
 import datetime
@@ -58,6 +56,9 @@ class State:
                 self.daytime,
             ]
         )
+
+
+DIM_STATE = len(State().toArray())
 
 
 class Env:

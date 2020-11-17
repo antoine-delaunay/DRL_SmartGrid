@@ -1,7 +1,10 @@
+import numpy as np
+import random
 import tensorflow as tf
 from tensorflow.keras import layers
 from tensorflow.keras.utils import plot_model
-from Env import *
+
+from Env import Env, ACTIONS, NB_ACTION, EPS, GAMMA, DIM_STATE
 
 
 def DQN(n_neurons, input_size):
@@ -31,16 +34,9 @@ def DQN(n_neurons, input_size):
 def predict(model, state, action):
     input_model = np.array([0.0] * NB_ACTION + list(state.toArray()))
 
-    if action == "charge":
-        input_model[0] = 1.0
-    elif action == "discharge":
-        input_model[1] = 1.0
-    # elif action == "generator":
-    #     input_model[2] = 1.0
-    # elif action == "discharge + generator":
-    #     input_model[3] = 1.0
-    else:
-        input_model[2] = 1.0
+    for i, a in enumerate(ACTIONS):
+        if a == action:
+            input_model[i] = 1.0
 
     return model(np.array([input_model]))
 
@@ -74,8 +70,9 @@ def train_step(model, transitions_batch, optimizer):
     return disc_loss
 
 
-def train(env: Env, nb_episodes=5, nb_steps=50, batch_size=10):
-    DQN_model = DQN(n_neurons=10, input_size=18)
+def train(env: Env, n_neurons, nb_episodes=50, nb_steps=50, batch_size=10):
+    input_size = DIM_STATE + NB_ACTION
+    DQN_model = DQN(n_neurons=n_neurons, input_size=input_size)
 
     optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3)
 
