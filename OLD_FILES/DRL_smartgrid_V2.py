@@ -6,6 +6,7 @@ import random
 import matplotlib.pyplot as plt
 import numpy as np
 import copy
+import time
 
 ACTIONS = ["charge", "discharge", "generator", "discharge + generator", "nothing"]
 NB_ACTION = len(ACTIONS)
@@ -262,12 +263,19 @@ def loss(model, transitions_batch):
 def train_step(model, transitions_batch, optimizer):
     # batch_size = transitions_batch.shape[0]
 
+    t0 = time.time()
     with tf.GradientTape() as disc_tape:
         disc_loss = loss(model, transitions_batch)
+    t1 = time.time()
 
     gradients = disc_tape.gradient(disc_loss, model.trainable_variables)
+    t2 = time.time()
 
     optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+    t3 = time.time()
+
+    #print("\n\nTime taken :\nLoss calculation : {}\nGradient calculation : {}\nApply gradient : {}".format( t1-t0, t2-t1, t3-t2 ))
+
     return disc_loss
 
 
@@ -282,8 +290,8 @@ Models supported :
 
 def train(model_used="DQN"):
 
-    nb_episodes = 100
-    nb_steps = 10
+    nb_episodes = 200
+    nb_steps = 50
     batch_size = 10
 
     if model_used == "DQN":
@@ -316,23 +324,31 @@ def train(model_used="DQN"):
             print(i_episode)
 
         for step in range(nb_steps):
+            
+            t0 = time.time()
             if model_used == "DQN":
                 action_probs = policy(DQN_model, env.currentState)
             if model_used == "Random":
                 action_probs = np.array([1 / NB_ACTION] * NB_ACTION)
             action = np.random.choice(ACTIONS, p=action_probs)
+            t1 = time.time()
             reward, next_state = env.act(action)
+            
 
             replay_memory.pop(0)
             replay_memory.append((env.currentState, action, reward, next_state))
 
             cost_hist.append(-reward)
-
+            t2 = time.time()
             if model_used == "DQN":
                 samples = random.sample(replay_memory, batch_size)
                 loss_episode += train_step(DQN_model, samples, optimizer)
+            t3 = time.time()
 
             env.currentState = next_state
+
+            #print("\n\nTime taken :\nPolicy calculation : {}\nTaking action : {}\nTraining : {}".format( t1-t0, t2-t1, t3-t2 ))
+
 
         loss_hist.append(loss_episode)
         
@@ -387,6 +403,7 @@ if __name__ == "__main__":
     ax.legend(["DQN", "Random"])
 
     plt.show()
+
 
 def test(DQN_model=DQN1):
     consoDQN,prodDQN,priceDQN = [], [], []

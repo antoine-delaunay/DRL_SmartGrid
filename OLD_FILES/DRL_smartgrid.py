@@ -334,8 +334,8 @@ if __name__ == "__main__":
     cumulated_costRandom1 = integrate(costRandom1)
     cumulated_costDQN1 = integrate(costDQN1)
 
-    print(len(cumulated_costDQN1), cumulated_costDQN1[:10])
-    print(len(cumulated_costRandom1), cumulated_costRandom1[:10])
+    print(len(cumulated_costDQN1), cumulated_costDQN1[99:110])
+    print(len(cumulated_costRandom1), cumulated_costRandom1[99:110])
 
     fig, ax = plt.subplots()
     ax.plot(cumulated_costDQN1)
