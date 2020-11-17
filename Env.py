@@ -186,7 +186,6 @@ class Env:
         else:
             cost -= self.diffProd * self.currentState.price / 10
 
-        # UPDATE SELF.PANELPROD, PRICE, CONSUMPTION, DAYTIME according to the dataset
         row = self.currentState.row + 1
         self.currentState.daytime = self.data[row, 1]
         self.currentState.panelProd = self.data[row, 5]
