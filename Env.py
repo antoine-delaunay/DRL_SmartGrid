@@ -88,7 +88,7 @@ class Env:
 
         # Capacity of the battery and the generator
         self.initState()
-        self.batteryCapacity = 0.4  # 60000.0 / self.panelProdMax
+        self.batteryCapacity = 10  # 60000.0 / self.panelProdMax
         self.generatorCapacity = (
             0.4  # Energie produite par le générateur en 5min 20000.0 / (12 * self.panelProdMax)
         )
