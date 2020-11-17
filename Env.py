@@ -80,10 +80,11 @@ class Env:
         # TODO: transformer daytime en float
         self.panelProdMax = max(self.data[:, 5])
         self.consumptionMax = max(self.data[:, 4])
+        self.priceMax = max(abs(self.data[:, 3]))
 
         self.data[:, 5] /= self.panelProdMax
         self.data[:, 4] /= self.consumptionMax
-        self.data[:, 3] /= 1000.0
+        self.data[:, 3] /= self.priceMax
 
         # Capacity of the battery and the generator
         self.initState()

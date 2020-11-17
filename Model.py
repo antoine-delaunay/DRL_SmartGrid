@@ -1,7 +1,7 @@
 import numpy as np
 import random
 import tensorflow as tf
-from tensorflow.keras import layers
+from tensorflow.keras import layers, activations
 from tensorflow.keras.utils import plot_model
 
 from Env import Env, ACTIONS, NB_ACTION, EPS, GAMMA, DIM_STATE
@@ -17,18 +17,26 @@ def DQN(n_neurons, input_size):
             kernel_initializer="glorot_normal",
         )
     )
-    model.add(layers.LeakyReLU(alpha=0.1))
+    model.add(layers.Activation(activations.sigmoid))
     model.add(
         layers.Dense(
             n_neurons, bias_initializer="glorot_normal", kernel_initializer="glorot_normal"
         )
     )
-    model.add(layers.LeakyReLU(alpha=0.1))
+    model.add(layers.Activation(activations.sigmoid))
 
     model.add(
         layers.Dense(units=1, bias_initializer="glorot_normal", kernel_initializer="glorot_normal")
     )
     return model
+
+
+def save(model, name):
+    model.save(name)
+
+
+def load(name):
+    return tf.keras.models.load_model(name)
 
 
 def predict(model, state, action):
