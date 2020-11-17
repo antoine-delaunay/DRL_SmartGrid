@@ -17,7 +17,19 @@ class State:
     def __init__(self):
         self.battery = 0.0
         self.panelProd = 0.0
+        self.panelProd1 = 0.0
+        self.panelProd2 = 0.0
+        self.panelProd3 = 0.0
+        self.panelProd4 = 0.0
+        self.panelProd5 = 0.0
+        
         self.consumption = 0.0
+        self.consumption1 = 0.0
+        self.consumption2 = 0.0
+        self.consumption3 = 0.0
+        self.consumption4 = 0.0
+        self.consumption5 = 0.0
+        
         self.price = 0.0
         self.daytime = 0.0
         self.row = 0
@@ -29,8 +41,11 @@ class State:
 
     def toArray(self):
         return np.array(
-            [self.battery, self.panelProd, self.consumption, self.price, 0]
-        )  # self.daytime])
+            [self.battery, self.panelProd,self.panelProd1,self.panelProd2,
+             self.panelProd3,self.panelProd4,self.panelProd5, self.consumption,
+             self.consumption1,self.consumption2,self.consumption3,
+             self.consumption4, self.consumption5, self.price, 0])
+          # self.daytime])
 
 
 class Env:
@@ -49,7 +64,7 @@ class Env:
         self.data[:, 5] /= self.panelProdMax
         self.data[:, 4] /= self.consumptionMax
         self.data[:, 3] /= 1000.0
-
+        
         #Capacity of the battery and the generator
         self.initState()
         self.batteryCapacity = 0.4      #60000.0 / self.panelProdMax
@@ -64,7 +79,7 @@ class Env:
         self.chargingCost = 0.0
         self.dischargingCost = 0.0
         # self.solarCost = 0.0
-        self.generatorCost = 0.4  # 0.314 à 0.528 $/kWh
+        self.generatorCost = 0.0  # 0.314 à 0.528 $/kWh
 
         #Yields
         self.chargingYield = 1.0
@@ -76,11 +91,25 @@ class Env:
             0, len(self.data)
         )  # Deuxième valeur à modifier en fonction du nombre de steps réalisés par épisode
         row = self.currentState.row
-        self.currentState.daytime = self.data[row, 1]
-        self.currentState.panelProd = self.data[row, 5]
-        self.currentState.price = self.data[row, 3]
-        self.currentState.consumption = self.data[row, 4]
         
+        self.currentState.daytime = self.data[row, 1]
+        
+        self.currentState.panelProd = self.data[row, 5]
+        self.currentState.panelProd1 = self.data[row-1, 5]
+        self.currentState.panelProd2 = self.data[row-2, 5]
+        self.currentState.panelProd3 = self.data[row-3, 5]
+        self.currentState.panelProd4 = self.data[row-4, 5]
+        self.currentState.panelProd5 = self.data[row-5, 5]    
+        
+        self.currentState.price = self.data[row, 3]
+        
+        self.currentState.consumption = self.data[row, 4]
+        self.currentState.consumption1 = self.data[row-1, 4]
+        self.currentState.consumption2 = self.data[row-2, 4]
+        self.currentState.consumption3 = self.data[row-3, 4]
+        self.currentState.consumption4 = self.data[row-4, 4]
+        self.currentState.consumption5 = self.data[row-5, 4]
+
         
     def act(self, action):
         self.diffProd = self.currentState.panelProd - self.currentState.consumption
@@ -111,11 +140,12 @@ class Env:
                 self.diffProd -=  self.currentState.discharge * self.dischargingYield
                 cost += abs( self.currentState.discharge * self.dischargingCost)
 
-        elif action == "generator":
-            if self.diffProd < 0:
-                self.currentState.generate = min(-self.diffProd, self.generatorCapacity)
-                self.diffProd += self.currentState.generate
-                cost += self.currentState.generate * self.generatorCost
+        #elif action == "generator":
+            
+         #  if self.diffProd < 0:
+         #      self.currentState.generate = min(-self.diffProd, self.generatorCapacity)
+         #      self.diffProd += self.currentState.generate
+         #      cost += self.currentState.generate * self.generatorCost
 
         elif action == "discharge + generator":
             if self.diffProd < 0:
@@ -124,10 +154,10 @@ class Env:
                 self.diffProd -=  self.currentState.discharge * self.dischargingYield
                 cost += abs( self.currentState.discharge * self.dischargingCost)
 
-            if self.diffProd < 0:
-                self.currentState.generate = min(-self.diffProd, self.generatorCapacity)
-                self.diffProd += self.currentState.generate
-                cost += self.currentState.generate * self.generatorCost
+            #if self.diffProd < 0:
+            #    self.currentState.generate = min(-self.diffProd, self.generatorCapacity)
+            #    self.diffProd += self.currentState.generate
+            #    cost += self.currentState.generate * self.generatorCost
                 
         self.currentState.trade=-self.diffProd
 
@@ -136,9 +166,22 @@ class Env:
         # UPDATE SELF.PANELPROD, PRICE, CONSUMPTION, DAYTIME according to the dataset
         row = self.currentState.row + 1
         self.currentState.daytime = self.data[row, 1]
+        
         self.currentState.panelProd = self.data[row, 5]
-        self.currentState.price = self.data[row, 3]
+        self.currentState.panelProd1 = self.data[row-1, 5]
+        self.currentState.panelProd2 = self.data[row-2, 5]
+        self.currentState.panelProd3 = self.data[row-3, 5]
+        self.currentState.panelProd4 = self.data[row-4, 5]
+        self.currentState.panelProd5 = self.data[row-5, 5]
+
         self.currentState.consumption = self.data[row, 4]
+        self.currentState.consumption1 = self.data[row-1, 4]
+        self.currentState.consumption2 = self.data[row-2, 4]
+        self.currentState.consumption3 = self.data[row-3, 4]
+        self.currentState.consumption4 = self.data[row-4, 4]
+        self.currentState.consumption5 = self.data[row-5, 4]
+
+        self.currentState.price = self.data[row, 3]
         self.currentState.row = row
 
         return -cost, self.currentState
@@ -245,7 +288,7 @@ def train(model_used="DQN"):
 
     if model_used == "DQN":
 
-        DQN_model = DQN(n_neurons=10, input_size=10)
+        DQN_model = DQN(n_neurons=20, input_size=20)
 
         optimizer = tf.keras.optimizers.Adam(learning_rate=1e-4)
 
@@ -334,8 +377,8 @@ if __name__ == "__main__":
     cumulated_costRandom1 = integrate(costRandom1)
     cumulated_costDQN1 = integrate(costDQN1)
 
-    print(len(cumulated_costDQN1), cumulated_costDQN1[99:110])
-    print(len(cumulated_costRandom1), cumulated_costRandom1[99:110])
+    print(len(cumulated_costDQN1), cumulated_costDQN1[:10])
+    print(len(cumulated_costRandom1), cumulated_costRandom1[:10])
 
     fig, ax = plt.subplots()
     ax.plot(cumulated_costDQN1)
@@ -356,7 +399,7 @@ def test(DQN_model=DQN1):
     print(initState.daytime)
     
     #DQN
-    for i in range(300):
+    for i in range(3000):
         action_probs = policy(DQN_model, env.currentState)
         action = np.random.choice(ACTIONS, p=action_probs)
         reward, next_state = env.act(action)
@@ -375,7 +418,7 @@ def test(DQN_model=DQN1):
         tradeDQN.append(env.currentState.trade)
         
         env.currentState = next_state
-        print(env.currentState.daytime)
+        #print(env.currentState.daytime)
     
     #Random
     consoRandom,prodRandom,priceRandom = [], [], []
@@ -387,7 +430,7 @@ def test(DQN_model=DQN1):
     print(env.currentState.daytime)
     print(initState.daytime)
     
-    for i in range(300):        
+    for i in range(3000):        
         #action_probs = np.array([1 / NB_ACTION] * NB_ACTION)
         #action = np.random.choice(ACTIONS, p=action_probs)
         action ="nothing"
