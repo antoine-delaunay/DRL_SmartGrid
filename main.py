@@ -1,8 +1,9 @@
 from Env import *
 from Model import *
-from Analyse import *
+from Analyze import *
 
-envTrain = Env("select_train_data_30m.csv")
+envTrain = Env("Data/select_train_data_30m.csv")
+envTest = Env("Data/select_test_data_30m.csv")
 
 print("Training...")
 lossDQN, DQN = train(envTrain)

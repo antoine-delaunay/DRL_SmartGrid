@@ -74,7 +74,7 @@ def train_step(model, transitions_batch, optimizer):
     return disc_loss
 
 
-def train(env: Env, nb_episodes=50, nb_steps=50, batch_size=10):
+def train(env: Env, nb_episodes=5, nb_steps=50, batch_size=10):
     DQN_model = DQN(n_neurons=10, input_size=18)
 
     optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3)
