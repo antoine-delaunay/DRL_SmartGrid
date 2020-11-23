@@ -66,19 +66,25 @@ def train_step(model, transitions_batch, optimizer):
     return disc_loss
 
 
-def train(env: Env, n_neurons, nb_episodes=50, nb_steps=50, batch_size=10):
+def train(env: Env, n_neurons, nb_episodes=50, nb_steps=50, batch_size=100, model_name = None, save_step = 5, recup_model = False):
+    alpha = 0.7
+
     current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     train_log_dir = "logs/" + current_time + "/train"
     train_summary_writer = tf.summary.create_file_writer(train_log_dir)
     train_loss = tf.keras.metrics.Mean("train_loss", dtype=tf.float32)
 
     input_size = DIM_STATE + NB_ACTION
-    DQN_model = DQN(n_neurons=n_neurons, input_size=input_size)
+    if recup_model:
+        DQN_model = load(model_name)
+        print("Model loaded")
+    else:
+        DQN_model = DQN(n_neurons=n_neurons, input_size=input_size)
 
-    optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3)
+    optimizer = tf.keras.optimizers.Adam(learning_rate=1e-4)
 
     replay_memory = []
-    replay_memory_init_size = 100
+    replay_memory_init_size = 10*batch_size
 
     env.initState(maxNbStep=nb_steps)
     for i in range(replay_memory_init_size):
@@ -95,10 +101,16 @@ def train(env: Env, n_neurons, nb_episodes=50, nb_steps=50, batch_size=10):
         if i_episode % 10 == 0:
             print(i_episode)
 
+        total_reward = 0
         for step in range(nb_steps):
             action_probs = policy(DQN_model, env.currentState)
             action = np.random.choice(ACTIONS, p=action_probs)
             reward, next_state = env.act(action)
+
+            if step == 0:
+                total_reward = reward
+            else:
+                total_reward = (1-alpha)*total_reward + alpha*reward  
 
             replay_memory.pop(0)
             replay_memory.append((env.currentState, action, reward, next_state))
@@ -112,5 +124,9 @@ def train(env: Env, n_neurons, nb_episodes=50, nb_steps=50, batch_size=10):
 
         with train_summary_writer.as_default():
             tf.summary.scalar("loss", train_loss.result(), step=i_episode)
+        
+        if model_name and i_episode%save_step == 0:
+            save(DQN_model , model_name)
+            print("Model saved")
 
     return (loss_hist, DQN_model)
