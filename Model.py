@@ -10,7 +10,7 @@ from Env import Env, ACTIONS, State
 NB_ACTION = len(ACTIONS)
 DIM_STATE = len(State().toArray())
 EPS = 0.5
-GAMMA = 0.2
+GAMMA = 0.9
 
 
 def DQN(n_neurons, input_size):
@@ -29,33 +29,53 @@ def load(name):
     return tf.keras.models.load_model(name)
 
 
+def predict_list(model, state_action_list):
+    def input_one_action(state, action):
+        input_action = np.zeros(NB_ACTION)
+        input_action[ACTIONS == action] = 1.0
+        return np.concatenate((input_action, state.toArray()))
+
+    input_model = []
+    for state, action in state_action_list:
+        if isinstance(action, (list, np.ndarray)):
+            for a in action:
+                input_model.append(input_one_action(state, a))
+        else:
+            input_model.append(input_one_action(state, action))
+
+    return model(np.array(input_model))
+
+
 def predict(model, state, action):
-    input_model = np.array([0.0] * NB_ACTION + list(state.toArray()))
-
-    for i, a in enumerate(ACTIONS):
-        if a == action:
-            input_model[i] = 1.0
-
-    return model(np.array([input_model]))
+    return predict_list(model, [(state, action)])
 
 
 def policy(model, state):
-    q_value = [predict(model, state, action) for action in ACTIONS]
+    q_value = predict(model, state, ACTIONS)
     prob = np.ones(NB_ACTION) * EPS / NB_ACTION
     prob[np.argmax(q_value)] += 1.0 - EPS
     return prob
 
 
 def loss(model, transitions_batch):
-    y = []
-    q = []
-    for state, action, reward, next_state in transitions_batch:
-        q_value = [predict(model, next_state, a) for a in ACTIONS]
-        best_next_action = np.argmax(q_value)
-        y.append(reward + GAMMA * q_value[best_next_action])
-        q.append(predict(model, state, action))
+    state_action_list_y = []
+    state_action_list_q = []
+    for state, action, _, next_state in transitions_batch:
+        state_action_list_y.append((next_state, ACTIONS))
+        state_action_list_q.append((state, action))
 
-    return tf.reduce_mean(tf.square(q - tf.stop_gradient(y)), name="loss_mse_train")
+    batch_comp = predict_list(model, state_action_list_q + state_action_list_y)
+    q = tf.reshape(batch_comp[: len(state_action_list_q)], [-1])
+    y_precomp = batch_comp[len(state_action_list_q) :]
+
+    y = []
+    for i, (_, _, reward, _) in enumerate(transitions_batch):
+        y.append(reward + GAMMA * np.max(y_precomp[NB_ACTION * i : NB_ACTION * (i + 1)]))
+
+    y = tf.convert_to_tensor(y, dtype=tf.float32)
+
+    # return tf.reduce_mean(tf.square(q - tf.stop_gradient(y)), name="loss_mse_train")
+    return tf.square(q - y)
 
 
 def train_step(model, transitions_batch, optimizer):
@@ -150,10 +170,10 @@ def train(
             discharge_hist.append(q_value[1])
             trade_hist.append(q_value[2])
 
-        train_reward(np.mean(reward_hist))
-        train_charge(np.mean(charge_hist))
-        train_discharge(np.mean(discharge_hist))
-        train_trade(np.mean(trade_hist))
+        train_reward(reward_hist)
+        train_charge(charge_hist)
+        train_discharge(discharge_hist)
+        train_trade(trade_hist)
 
         with train_summary_writer.as_default():
             tf.summary.scalar("loss", train_loss.result(), step=i_episode)

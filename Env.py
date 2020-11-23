@@ -3,7 +3,7 @@ import numpy as np
 import datetime
 
 # ACTIONS = ["charge", "discharge", "generator", "discharge + generator", "nothing"]
-ACTIONS = ["charge", "discharge", "trade"]
+ACTIONS = np.array(["charge", "discharge", "trade"])
 
 
 class State:
