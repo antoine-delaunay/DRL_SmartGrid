@@ -10,11 +10,8 @@ from Env import Env, ACTIONS, NB_ACTION, EPS, GAMMA, DIM_STATE
 
 def DQN(n_neurons, input_size):
     model = tf.keras.Sequential(name="DQN")
-    model.add(layers.Dense(n_neurons, input_shape=(input_size,)))
-    model.add(layers.Activation(activations.sigmoid))
-    model.add(layers.Dense(n_neurons))
-    model.add(layers.Activation(activations.sigmoid))
-
+    model.add(layers.Dense(n_neurons, input_shape=(input_size,), activation="sigmoid"))
+    # model.add(layers.Dense(n_neurons), activation="sigmoid")
     model.add(layers.Dense(units=1))
     return model
 
@@ -73,6 +70,7 @@ def train(env: Env, n_neurons, nb_episodes=50, nb_steps=50, batch_size=100, mode
     train_log_dir = "logs/" + current_time + "/train"
     train_summary_writer = tf.summary.create_file_writer(train_log_dir)
     train_loss = tf.keras.metrics.Mean("train_loss", dtype=tf.float32)
+    train_reward = tf.keras.metrics.Mean("train_reward", dtype=tf.float32)
 
     input_size = DIM_STATE + NB_ACTION
     if recup_model:
@@ -84,7 +82,7 @@ def train(env: Env, n_neurons, nb_episodes=50, nb_steps=50, batch_size=100, mode
     optimizer = tf.keras.optimizers.Adam(learning_rate=1e-4)
 
     replay_memory = []
-    replay_memory_init_size = 10*batch_size
+    replay_memory_init_size = 10 * batch_size
 
     env.initState(maxNbStep=nb_steps)
     for i in range(replay_memory_init_size):
@@ -102,10 +100,12 @@ def train(env: Env, n_neurons, nb_episodes=50, nb_steps=50, batch_size=100, mode
             print(i_episode)
 
         total_reward = 0
+        reward_hist = []
         for step in range(nb_steps):
             action_probs = policy(DQN_model, env.currentState)
             action = np.random.choice(ACTIONS, p=action_probs)
             reward, next_state = env.act(action)
+            reward_hist.append(reward)
 
             if step == 0:
                 total_reward = reward
@@ -121,12 +121,17 @@ def train(env: Env, n_neurons, nb_episodes=50, nb_steps=50, batch_size=100, mode
         loss_hist.append(loss_episode)
 
         train_loss(loss_episode)
+        train_reward(np.mean(reward_hist))
 
         with train_summary_writer.as_default():
             tf.summary.scalar("loss", train_loss.result(), step=i_episode)
-        
+            tf.summary.scalar("reward", train_reward.result(), step=i_episode)
+
+        train_loss.reset_states()
+        train_reward.reset_states()
+
         if model_name and i_episode%save_step == 0:
             save(DQN_model , model_name)
             print("Model saved")
 
-    return (loss_hist, DQN_model)
+    return DQN_model
