@@ -1,5 +1,6 @@
 import numpy as np
 import random
+import datetime
 import tensorflow as tf
 from tensorflow.keras import layers, activations
 from tensorflow.keras.utils import plot_model
@@ -79,6 +80,11 @@ def train_step(model, transitions_batch, optimizer):
 
 
 def train(env: Env, n_neurons, nb_episodes=50, nb_steps=50, batch_size=10):
+    current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    train_log_dir = "logs/gradient_tape/" + current_time + "/train"
+    train_summary_writer = tf.summary.create_file_writer(train_log_dir)
+    train_loss = tf.keras.metrics.Mean("train_loss", dtype=tf.float32)
+
     input_size = DIM_STATE + NB_ACTION
     DQN_model = DQN(n_neurons=n_neurons, input_size=input_size)
 
@@ -114,5 +120,10 @@ def train(env: Env, n_neurons, nb_episodes=50, nb_steps=50, batch_size=10):
             loss_episode += train_step(DQN_model, samples, optimizer)
 
         loss_hist.append(loss_episode)
+
+        train_loss(loss_episode)
+
+        with train_summary_writer.as_default():
+            tf.summary.scalar("loss", train_loss.result(), step=i_episode)
 
     return (loss_hist, DQN_model)
