@@ -3,31 +3,19 @@ import numpy as np
 import datetime
 
 # ACTIONS = ["charge", "discharge", "generator", "discharge + generator", "nothing"]
-ACTIONS = ["charge", "discharge", "nothing"]
+ACTIONS = ["charge", "discharge", "trade"]
 NB_ACTION = len(ACTIONS)
-EPS = 0.5
-GAMMA = 1.0
+EPS = 0.4
+GAMMA = 0.99
 
 
 class State:
     def __init__(self):
         self.battery = 0.0
         self.panelProd = 0.0
-        self.panelProd1 = 0.0
-        self.panelProd2 = 0.0
-        self.panelProd3 = 0.0
-        self.panelProd4 = 0.0
-        self.panelProd5 = 0.0
-
         self.consumption = 0.0
-        self.consumption1 = 0.0
-        self.consumption2 = 0.0
-        self.consumption3 = 0.0
-        self.consumption4 = 0.0
-        self.consumption5 = 0.0
-
         self.price = 0.0
-        self.daytime = 0.0
+        # self.daytime = 0.0
         self.row = 0
 
         self.charge = 0.0
@@ -36,25 +24,8 @@ class State:
         self.trade = 0.0
 
     def toArray(self):
-        return np.array(
-            [
-                self.battery,
-                self.panelProd,
-                self.panelProd1,
-                self.panelProd2,
-                self.panelProd3,
-                self.panelProd4,
-                self.panelProd5,
-                self.consumption,
-                self.consumption1,
-                self.consumption2,
-                self.consumption3,
-                self.consumption4,
-                self.consumption5,
-                self.price,
-                self.daytime,
-            ]
-        )
+        # return np.array([self.battery, self.panelProd, self.consumption, self.price, self.daytime,])
+        return np.array([self.battery, self.panelProd, self.consumption, self.price])
 
 
 DIM_STATE = len(State().toArray())
@@ -67,17 +38,16 @@ class Env:
 
         self.data = df.values
 
-        self.data[:, 1] = [
-            (
-                datetime.datetime.strptime(dateStr.split("+")[0], "%Y-%m-%d %H:%M:%S")
-                - datetime.datetime.strptime(dateStr.split(" ")[0], "%Y-%m-%d")
-            ).total_seconds()
-            / (24 * 60 * 60)
-            for dateStr in self.data[:, 1]
-        ]
-
         # Prétraitement des données
-        # TODO: transformer daytime en float
+        # self.data[:, 1] = [
+        #     (
+        #         datetime.datetime.strptime(dateStr.split("+")[0], "%Y-%m-%d %H:%M:%S")
+        #         - datetime.datetime.strptime(dateStr.split(" ")[0], "%Y-%m-%d")
+        #     ).total_seconds()
+        #     / (24 * 60 * 60)
+        #     for dateStr in self.data[:, 1]
+        # ]
+
         self.panelProdMax = max(self.data[:, 5])
         self.consumptionMax = max(self.data[:, 4])
         self.priceMax = max(abs(self.data[:, 3]))
@@ -110,27 +80,14 @@ class Env:
         self.chargingYield = 1.0
         self.dischargingYield = 1.0
 
-    def initState(self):
+    def initState(self, maxNbStep=0):
         self.currentState = State()
-        self.currentState.row = np.random.randint(
-            0, len(self.data)
-        )  # Deuxième valeur à modifier en fonction du nombre de steps réalisés par épisode
+        self.currentState.row = np.random.randint(0, len(self.data) - maxNbStep)
         row = self.currentState.row
-        self.currentState.daytime = self.data[row, 1]
+        # self.currentState.daytime = self.data[row, 1]
         self.currentState.panelProd = self.data[row, 5]
-        self.currentState.panelProd1 = self.data[row - 1, 5]
-        self.currentState.panelProd2 = self.data[row - 2, 5]
-        self.currentState.panelProd3 = self.data[row - 3, 5]
-        self.currentState.panelProd4 = self.data[row - 4, 5]
-        self.currentState.panelProd5 = self.data[row - 5, 5]
-
         self.currentState.price = self.data[row, 3]
         self.currentState.consumption = self.data[row, 4]
-        self.currentState.consumption1 = self.data[row - 1, 4]
-        self.currentState.consumption2 = self.data[row - 2, 4]
-        self.currentState.consumption3 = self.data[row - 3, 4]
-        self.currentState.consumption4 = self.data[row - 4, 4]
-        self.currentState.consumption5 = self.data[row - 5, 4]
 
     def act(self, action):
         self.diffProd = self.currentState.panelProd - self.currentState.consumption
@@ -189,20 +146,8 @@ class Env:
         row = self.currentState.row + 1
         self.currentState.daytime = self.data[row, 1]
         self.currentState.panelProd = self.data[row, 5]
-        self.currentState.panelProd1 = self.data[row - 1, 5]
-        self.currentState.panelProd2 = self.data[row - 2, 5]
-        self.currentState.panelProd3 = self.data[row - 3, 5]
-        self.currentState.panelProd4 = self.data[row - 4, 5]
-        self.currentState.panelProd5 = self.data[row - 5, 5]
-
         self.currentState.price = self.data[row, 3]
         self.currentState.consumption = self.data[row, 4]
-        self.currentState.consumption1 = self.data[row - 1, 4]
-        self.currentState.consumption2 = self.data[row - 2, 4]
-        self.currentState.consumption3 = self.data[row - 3, 4]
-        self.currentState.consumption4 = self.data[row - 4, 4]
-        self.currentState.consumption5 = self.data[row - 5, 4]
-
         self.currentState.row = row
 
         return -cost, self.currentState

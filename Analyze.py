@@ -47,7 +47,7 @@ def strategyAction(strategy, state, DQN_model=None):
 
 
 def test(env: Env, nb_step=3000, DQN_model=None):
-    env.initState()
+    env.initState(maxNbStep=nb_step)
     initState = copy.deepcopy(env.currentState)
 
     conso, prod, price = [], [], []
