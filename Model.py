@@ -80,6 +80,9 @@ def train(
     train_summary_writer = tf.summary.create_file_writer(train_log_dir)
     train_loss = tf.keras.metrics.Mean("train_loss", dtype=tf.float32)
     train_reward = tf.keras.metrics.Mean("train_reward", dtype=tf.float32)
+    train_charge = tf.keras.metrics.Mean("train_charge", dtype=tf.float32)
+    train_discharge = tf.keras.metrics.Mean("train_discharge", dtype=tf.float32)
+    train_trade = tf.keras.metrics.Mean("train_trade", dtype=tf.float32)
 
     input_size = DIM_STATE + NB_ACTION
     if model_name and recup_model:
@@ -130,20 +133,35 @@ def train(
         # Test phase : compute reward
         env.initState(maxNbStep=nb_steps)
         reward_hist = []
+        charge_hist = []
+        discharge_hist = []
+        trade_hist = []
         for step in range(nb_steps):
             q_value = [predict(DQN_model, env.currentState, a) for a in ACTIONS]
             action = ACTIONS[np.argmax(q_value)]
             reward, _ = env.act(action)
             reward_hist.append(reward)
+            charge_hist.append(q_value[0])
+            discharge_hist.append(q_value[1])
+            trade_hist.append(q_value[2])
 
         train_reward(np.mean(reward_hist))
+        train_charge(np.mean(charge_hist))
+        train_discharge(np.mean(discharge_hist))
+        train_trade(np.mean(trade_hist))
 
         with train_summary_writer.as_default():
             tf.summary.scalar("loss", train_loss.result(), step=i_episode)
             tf.summary.scalar("reward", train_reward.result(), step=i_episode)
+            tf.summary.scalar("Q value : charge", train_charge.result(), step=i_episode)
+            tf.summary.scalar("Q value : discharge", train_discharge.result(), step=i_episode)
+            tf.summary.scalar("Q value : trade", train_trade.result(), step=i_episode)
 
         train_loss.reset_states()
         train_reward.reset_states()
+        train_charge.reset_states()
+        train_discharge.reset_states()
+        train_trade.reset_states()
 
         if model_name and (i_episode + 1) % save_step == 0:
             save(DQN_model, model_name)

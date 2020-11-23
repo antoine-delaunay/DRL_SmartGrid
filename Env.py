@@ -5,8 +5,8 @@ import datetime
 # ACTIONS = ["charge", "discharge", "generator", "discharge + generator", "nothing"]
 ACTIONS = ["charge", "discharge", "trade"]
 NB_ACTION = len(ACTIONS)
-EPS = 0.4
-GAMMA = 0.8
+EPS = 0.9
+GAMMA = 0.9
 
 
 class State:
@@ -107,7 +107,9 @@ class Env:
                 )
                 self.currentState.battery += self.currentState.charge * self.chargingYield
                 self.diffProd -= self.currentState.charge
-                cost += self.currentState.charge * self.chargingCost
+                # cost += self.currentState.charge * self.chargingCost
+                if self.currentState.charge > 0:
+                    cost = -1.0
 
         elif action == "discharge":
             if self.diffProd < 0:
@@ -116,7 +118,7 @@ class Env:
                 )
                 self.currentState.battery += self.currentState.discharge
                 self.diffProd -= self.currentState.discharge * self.dischargingYield
-                cost += abs(self.currentState.discharge * self.dischargingCost)
+                # cost += abs(self.currentState.discharge * self.dischargingCost)
 
         # elif action == "generator":
         #     if self.diffProd < 0:
@@ -145,8 +147,7 @@ class Env:
         # else:
         #     cost -= self.diffProd * self.currentState.price / 10
 
-        cost = 0
-        if abs(self.diffProd) > 1e-5:
+        if self.diffProd < 0:
             cost = 1.0
 
         row = self.currentState.row + 1
