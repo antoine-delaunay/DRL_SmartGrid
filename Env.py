@@ -76,8 +76,8 @@ class Env:
 
     def initState(self, maxNbStep=0):
         self.currentState = State()
-        # self.currentState.row = np.random.randint(0, len(self.data) - maxNbStep)
-        self.currentState.row = np.random.randint(12500, 13500)
+        self.currentState.row = np.random.randint(0, len(self.data) - maxNbStep)
+        # self.currentState.row = np.random.randint(12500, 13500)
         row = self.currentState.row
         # self.currentState.daytime = self.data[row, 1]
         self.currentState.panelProd = self.data[row, 5]

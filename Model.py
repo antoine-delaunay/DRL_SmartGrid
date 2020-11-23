@@ -111,7 +111,7 @@ def train(
 
     input_size = DIM_STATE + NB_ACTION
     if model_name and recup_model:
-        DQN_model = load(model_name)
+        DQN_model = load("models/" + model_name)
         print("Model loaded")
     else:
         DQN_model = DQN(n_neurons=n_neurons, input_size=input_size)
@@ -162,7 +162,7 @@ def train(
         discharge_hist = []
         trade_hist = []
         for step in range(nb_steps):
-            q_value = [predict(DQN_model, env.currentState, a) for a in ACTIONS]
+            q_value = predict(DQN_model, env.currentState, ACTIONS)
             action = ACTIONS[np.argmax(q_value)]
             reward, _ = env.act(action)
             reward_hist.append(reward)
