@@ -5,13 +5,18 @@ import tensorflow as tf
 from tensorflow.keras import layers, activations
 from tensorflow.keras.utils import plot_model
 
-from Env import Env, ACTIONS, NB_ACTION, EPS, GAMMA, DIM_STATE
+from Env import Env, ACTIONS, State
+
+NB_ACTION = len(ACTIONS)
+DIM_STATE = len(State().toArray())
+EPS = 0.5
+GAMMA = 0.2
 
 
 def DQN(n_neurons, input_size):
     model = tf.keras.Sequential(name="DQN")
     model.add(layers.Dense(n_neurons, input_shape=(input_size,), activation="sigmoid"))
-    # model.add(layers.Dense(n_neurons), activation="sigmoid")
+    model.add(layers.Dense(n_neurons, activation="sigmoid"))
     model.add(layers.Dense(units=1))
     return model
 

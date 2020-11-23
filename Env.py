@@ -4,9 +4,6 @@ import datetime
 
 # ACTIONS = ["charge", "discharge", "generator", "discharge + generator", "nothing"]
 ACTIONS = ["charge", "discharge", "trade"]
-NB_ACTION = len(ACTIONS)
-EPS = 0.9
-GAMMA = 0.9
 
 
 class State:
@@ -26,9 +23,6 @@ class State:
     def toArray(self):
         # return np.array([self.battery, self.panelProd, self.consumption, self.price, self.daytime,])
         return np.array([self.battery, self.panelProd, self.consumption, self.price])
-
-
-DIM_STATE = len(State().toArray())
 
 
 class Env:
