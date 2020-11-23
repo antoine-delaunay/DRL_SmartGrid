@@ -70,7 +70,7 @@ def train(
     nb_steps=50,
     batch_size=100,
     model_name=None,
-    save_step=5,
+    save_step=50,
     recup_model=False,
 ):
     alpha = 0.7
@@ -106,18 +106,18 @@ def train(
         if i_episode % 10 == 0:
             print(i_episode)
 
-        total_reward = 0
-        reward_hist = []
+        # total_reward = 0
+        # reward_hist = []
         for step in range(nb_steps):
             action_probs = policy(DQN_model, env.currentState)
             action = np.random.choice(ACTIONS, p=action_probs)
             reward, next_state = env.act(action)
-            reward_hist.append(reward)
+            # reward_hist.append(reward)
 
-            if step == 0:
-                total_reward = reward
-            else:
-                total_reward = (1 - alpha) * total_reward + alpha * reward
+            # if step == 0:
+            #     total_reward = reward
+            # else:
+            #     total_reward = (1 - alpha) * total_reward + alpha * reward
 
             replay_memory.pop(0)
             replay_memory.append((env.currentState, action, reward, next_state))
@@ -126,6 +126,16 @@ def train(
             loss_episode += train_step(DQN_model, samples, optimizer)
 
         train_loss(loss_episode)
+
+        # Test phase : compute reward
+        env.initState(maxNbStep=nb_steps)
+        reward_hist = []
+        for step in range(nb_steps):
+            q_value = [predict(DQN_model, env.currentState, a) for a in ACTIONS]
+            action = ACTIONS[np.argmax(q_value)]
+            reward, _ = env.act(action)
+            reward_hist.append(reward)
+
         train_reward(np.mean(reward_hist))
 
         with train_summary_writer.as_default():
@@ -135,8 +145,10 @@ def train(
         train_loss.reset_states()
         train_reward.reset_states()
 
-        if model_name and i_episode % save_step == 0:
+        if model_name and (i_episode + 1) % save_step == 0:
             save(DQN_model, model_name)
             print("Model saved")
 
+    save(DQN_model, model_name)
+    print("Model saved")
     return DQN_model
