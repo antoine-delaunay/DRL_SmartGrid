@@ -63,7 +63,16 @@ def train_step(model, transitions_batch, optimizer):
     return disc_loss
 
 
-def train(env: Env, n_neurons, nb_episodes=50, nb_steps=50, batch_size=100, model_name = None, save_step = 5, recup_model = False):
+def train(
+    env: Env,
+    n_neurons,
+    nb_episodes=50,
+    nb_steps=50,
+    batch_size=100,
+    model_name=None,
+    save_step=5,
+    recup_model=False,
+):
     alpha = 0.7
 
     current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -91,8 +100,6 @@ def train(env: Env, n_neurons, nb_episodes=50, nb_steps=50, batch_size=100, mode
         reward, next_state = env.act(action)
         replay_memory.append((env.currentState, action, reward, next_state))
 
-    loss_hist = []
-
     for i_episode in range(nb_episodes):
         env.initState(maxNbStep=nb_steps)
         loss_episode = 0.0
@@ -110,15 +117,13 @@ def train(env: Env, n_neurons, nb_episodes=50, nb_steps=50, batch_size=100, mode
             if step == 0:
                 total_reward = reward
             else:
-                total_reward = (1-alpha)*total_reward + alpha*reward  
+                total_reward = (1 - alpha) * total_reward + alpha * reward
 
             replay_memory.pop(0)
             replay_memory.append((env.currentState, action, reward, next_state))
 
             samples = random.sample(replay_memory, batch_size)
             loss_episode += train_step(DQN_model, samples, optimizer)
-
-        loss_hist.append(loss_episode)
 
         train_loss(loss_episode)
         train_reward(np.mean(reward_hist))
@@ -130,8 +135,8 @@ def train(env: Env, n_neurons, nb_episodes=50, nb_steps=50, batch_size=100, mode
         train_loss.reset_states()
         train_reward.reset_states()
 
-        if model_name and i_episode%save_step == 0:
-            save(DQN_model , model_name)
+        if model_name and i_episode % save_step == 0:
+            save(DQN_model, model_name)
             print("Model saved")
 
     return DQN_model
