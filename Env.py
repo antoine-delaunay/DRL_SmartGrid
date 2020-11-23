@@ -6,7 +6,7 @@ import datetime
 ACTIONS = ["charge", "discharge", "trade"]
 NB_ACTION = len(ACTIONS)
 EPS = 0.4
-GAMMA = 0.99
+GAMMA = 0.8
 
 
 class State:
@@ -82,11 +82,13 @@ class Env:
 
     def initState(self, maxNbStep=0):
         self.currentState = State()
-        self.currentState.row = np.random.randint(0, len(self.data) - maxNbStep)
+        # self.currentState.row = np.random.randint(0, len(self.data) - maxNbStep)
+        self.currentState.row = np.random.randint(12500, 13500)
         row = self.currentState.row
         # self.currentState.daytime = self.data[row, 1]
         self.currentState.panelProd = self.data[row, 5]
-        self.currentState.price = self.data[row, 3]
+        self.currentState.price = 1.0
+        # self.currentState.price = self.data[row, 3]
         self.currentState.consumption = self.data[row, 4]
 
     def act(self, action):
@@ -138,15 +140,20 @@ class Env:
 
         self.currentState.trade = -self.diffProd
 
+        # if self.diffProd < 0:
+        #     cost -= self.diffProd * self.currentState.price
+        # else:
+        #     cost -= self.diffProd * self.currentState.price / 10
+
+        cost = 0
         if self.diffProd < 0:
-            cost -= self.diffProd * self.currentState.price
-        else:
-            cost -= self.diffProd * self.currentState.price / 10
+            cost = 1.0
 
         row = self.currentState.row + 1
         self.currentState.daytime = self.data[row, 1]
         self.currentState.panelProd = self.data[row, 5]
-        self.currentState.price = self.data[row, 3]
+        # self.currentState.price = self.data[row, 3]
+        self.currentState.price = 1.0
         self.currentState.consumption = self.data[row, 4]
         self.currentState.row = row
 

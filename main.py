@@ -6,7 +6,7 @@ envTrain = Env("Data/select_train_data_30m.csv")
 envTest = Env("Data/select_test_data_30m.csv")
 
 print("Training...")
-lossDQN, DQN = train(envTrain, n_neurons=18, nb_episodes=50, nb_steps=50, batch_size=10)
+DQN = train(envTrain, n_neurons=5, nb_episodes=100, nb_steps=10, batch_size=100)
 print("Done")
 
 # save(DQN, "Models/test")
