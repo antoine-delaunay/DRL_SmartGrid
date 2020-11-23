@@ -146,7 +146,7 @@ class Env:
         #     cost -= self.diffProd * self.currentState.price / 10
 
         cost = 0
-        if self.diffProd < 0:
+        if abs(self.diffProd) > 1e-5:
             cost = 1.0
 
         row = self.currentState.row + 1

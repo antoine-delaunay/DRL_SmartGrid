@@ -82,7 +82,7 @@ def train(
     train_reward = tf.keras.metrics.Mean("train_reward", dtype=tf.float32)
 
     input_size = DIM_STATE + NB_ACTION
-    if recup_model:
+    if model_name and recup_model:
         DQN_model = load(model_name)
         print("Model loaded")
     else:
@@ -149,6 +149,7 @@ def train(
             save(DQN_model, model_name)
             print("Model saved")
 
-    save(DQN_model, model_name)
-    print("Model saved")
+    if model_name:
+        save(DQN_model, model_name)
+        print("Model saved")
     return DQN_model
