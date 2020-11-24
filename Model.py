@@ -9,14 +9,13 @@ from Env import Env, ACTIONS, State
 
 NB_ACTION = len(ACTIONS)
 DIM_STATE = len(State().toArray())
-EPS = 0.8
-GAMMA = 0.8
+GAMMA = 0.9
 
 
 def DQN(n_neurons, input_size):
     model = tf.keras.Sequential(name="DQN")
     model.add(layers.Dense(n_neurons, input_shape=(input_size,), activation="sigmoid"))
-    model.add(layers.Dense(n_neurons, activation="sigmoid"))
+    # model.add(layers.Dense(n_neurons, activation="sigmoid"))
     model.add(layers.Dense(units=1))
     return model
 
@@ -50,23 +49,22 @@ def predict(model, state, action):
     return predict_list(model, [(state, action)])
 
 
-def policy(model, state):
+def eps_greedy_policy(model, state, epsilon):
     q_value = predict(model, state, ACTIONS)
-    prob = np.ones(NB_ACTION) * EPS / NB_ACTION
-    prob[np.argmax(q_value)] += 1.0 - EPS
+    prob = np.ones(NB_ACTION) * epsilon / NB_ACTION
+    prob[np.argmax(q_value)] += 1.0 - epsilon
     return prob
 
 
-def loss(model, transitions_batch):
+def loss(model, target_model, transitions_batch):
     state_action_list_y = [(next_state, ACTIONS) for _, _, _, next_state in transitions_batch]
     state_action_list_q = [(state, action) for state, action, _, _ in transitions_batch]
 
-    batch_comp = predict_list(model, state_action_list_q + state_action_list_y)
-    q = tf.reshape(batch_comp[: len(state_action_list_q)], [-1])
-    y_precomp = batch_comp[len(state_action_list_q) :]
+    q = tf.reshape(predict_list(model, state_action_list_q), [-1])
 
+    batch_target = predict_list(target_model, state_action_list_y)
     y = [
-        reward + GAMMA * np.max(y_precomp[NB_ACTION * i : NB_ACTION * (i + 1)])
+        reward + GAMMA * np.max(batch_target[NB_ACTION * i : NB_ACTION * (i + 1)])
         for i, (_, _, reward, _) in enumerate(transitions_batch)
     ]
     y = tf.convert_to_tensor(y, dtype=tf.float32)
@@ -95,9 +93,9 @@ def loss_double(model_A, model_B, transitions_batch):
     return tf.square(q - tf.stop_gradient(y))
 
 
-def train_step(model, transitions_batch, optimizer):
+def train_step(model, target_model, transitions_batch, optimizer):
     with tf.GradientTape() as disc_tape:
-        disc_loss = loss(model, transitions_batch)
+        disc_loss = loss(model, target_model, transitions_batch)
 
     gradients = disc_tape.gradient(disc_loss, model.trainable_variables)
     gradients = [tf.clip_by_norm(g, 1.0) for g in gradients]
@@ -127,9 +125,13 @@ def train(
     save_step=None,
     recup_model=False,
     algo="simple",
+    replay_memory_init_size=10000,
+    replay_memory_size=100000,
+    update_target_estimator_every=10000,
+    epsilon_start=1.0,
+    epsilon_min=0.1,
+    epsilon_decay_steps=100000,
 ):
-    alpha = 0.7
-
     current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     train_log_dir = f"logs/{model_name}_{current_time}/train"
     train_summary_writer = tf.summary.create_file_writer(train_log_dir)
@@ -140,65 +142,87 @@ def train(
         train_qvalues[a] = tf.keras.metrics.Mean("train_" + a, dtype=tf.float32)
 
     input_size = DIM_STATE + NB_ACTION
-    DQN_model = []
+    DQN_model = {}
     if model_name and recup_model:
-        DQN_model.append(load(f"models/{model_name}"))
+        DQN_model["Q_estimator"] = load(f"models/{model_name}")
         print("Model loaded")
         # we have to check if the model loaded has the same input size than the one expected here
     else:
-        DQN_model.append(DQN(n_neurons=n_neurons, input_size=input_size))
+        DQN_model["Q_estimator"] = DQN(n_neurons=n_neurons, input_size=input_size)
 
+    if algo == "simple":
+        DQN_model["target_estimator"] = DQN(n_neurons=n_neurons, input_size=input_size)
     if algo == "double":
-        DQN_model.append(DQN(n_neurons=n_neurons, input_size=input_size))
+        DQN_model["Q_estimator_bis"] = DQN(n_neurons=n_neurons, input_size=input_size)
 
     optimizer = tf.keras.optimizers.Adam(learning_rate=1e-4)
 
+    epsilon = epsilon_start
+    d_epsilon = (epsilon_start - epsilon_min) / float(epsilon_decay_steps)
     replay_memory = []
-    replay_memory_init_size = 10 * batch_size
-
-    env.initState(maxNbStep=replay_memory_init_size)
+    env.reset()
     for i in range(replay_memory_init_size):
-        action_probs = policy(DQN_model[0], env.currentState)
-        action = np.random.choice(ACTIONS, p=action_probs)
-        reward, next_state = env.act(action)
+        next_state = None
+        while next_state is None:
+            action_probs = eps_greedy_policy(DQN_model["Q_estimator"], env.currentState, epsilon)
+            action = np.random.choice(ACTIONS, p=action_probs)
+            reward, next_state = env.step(action)
+            if next_state is not None:
+                break
+            env.reset()
+
         replay_memory.append((env.currentState, action, reward, next_state))
 
+    total_step = 0
     for i_episode in range(nb_episodes):
-        env.initState(maxNbStep=nb_steps)
+        env.reset(nb_step=nb_steps)
         if i_episode % 10 == 0:
             print(i_episode)
 
+        # Train phase
         if algo == "double":
             if np.random.rand() > 0.5:
-                DQN_model[0], DQN_model[1] = DQN_model[1], DQN_model[0]
+                DQN_model["Q_estimator"], DQN_model["Q_estimator_bis"] = (
+                    DQN_model["Q_estimator_bis"],
+                    DQN_model["Q_estimator"],
+                )
 
-        # total_reward = 0
         for step in range(nb_steps):
-            action_probs = policy(DQN_model[0], env.currentState)
+            if algo == "simple":
+                if total_step % update_target_estimator_every == 0:
+                    DQN_model["target_estimator"].set_weights(
+                        DQN_model["Q_estimator"].get_weights()
+                    )
+
+            action_probs = eps_greedy_policy(DQN_model["Q_estimator"], env.currentState, epsilon)
             action = np.random.choice(ACTIONS, p=action_probs)
-            reward, next_state = env.act(action)
+            reward, next_state = env.step(action)
 
-            # if step == 0:
-            #     total_reward = reward
-            # else:
-            #     total_reward = (1 - alpha) * total_reward + alpha * reward
-
-            replay_memory.pop(0)
+            if len(replay_memory) == replay_memory_size:
+                replay_memory.pop(0)
             replay_memory.append((env.currentState, action, reward, next_state))
 
             samples = random.sample(replay_memory, batch_size)
+            if algo == "simple":
+                loss_step = train_step(
+                    DQN_model["Q_estimator"], DQN_model["target_estimator"], samples, optimizer
+                )
             if algo == "double":
-                loss_step = train_step_double(DQN_model[0], DQN_model[1], samples, optimizer)
-            else:
-                loss_step = train_step(DQN_model[0], samples, optimizer)
+                loss_step = train_step_double(
+                    DQN_model["Q_estimator"], DQN_model["Q_estimator_bis"], samples, optimizer
+                )
             train_loss(loss_step)
 
+            total_step += 1
+
+        epsilon = max(epsilon - d_epsilon, epsilon_min)
+
         # Test phase : compute reward
-        env.initState(maxNbStep=nb_steps)
+        env.reset(nb_step=nb_steps)
         for step in range(nb_steps):
-            q_value = predict(DQN_model[0], env.currentState, ACTIONS)
+            q_value = predict(DQN_model["Q_estimator"], env.currentState, ACTIONS)
             action = ACTIONS[np.argmax(q_value)]
-            reward, _ = env.act(action)
+            reward, _ = env.step(action)
             train_reward(reward)
             for q, a in zip(q_value, ACTIONS):
                 train_qvalues[a](q)
@@ -215,10 +239,10 @@ def train(
             train_qvalues[a].reset_states()
 
         if model_name and save_step and (i_episode + 1) % save_step == 0:
-            save(DQN_model[0], f"models/{model_name}")
+            save(DQN_model["Q_estimator"], f"models/{model_name}")
             print("Model saved")
 
     if model_name and save_step:
-        save(DQN_model[0], f"models/{model_name}")
+        save(DQN_model["Q_estimator"], f"models/{model_name}")
         print("Model saved")
-    return DQN_model[0]
+    return DQN_model["Q_estimator"]

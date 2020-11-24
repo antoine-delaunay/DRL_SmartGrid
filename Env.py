@@ -52,7 +52,7 @@ class Env:
         self.data[:, 3] /= self.priceMax
 
         # Capacity of the battery and the generator
-        self.initState()
+        self.reset()
         self.batteryCapacity = 10  # 60000.0 / self.panelProdMax
         self.generatorCapacity = (
             0.4  # Energie produite par le générateur en 5min 20000.0 / (12 * self.panelProdMax)
@@ -75,10 +75,9 @@ class Env:
         self.chargingYield = 1.0
         self.dischargingYield = 1.0
 
-    def initState(self, maxNbStep=0):
+    def reset(self, nb_step=0):
         self.currentState = State()
-        self.currentState.row = np.random.randint(0, len(self.data) - maxNbStep)
-        # self.currentState.row = np.random.randint(12500, 13500)
+        self.currentState.row = np.random.randint(0, len(self.data) - nb_step)
         row = self.currentState.row
         # self.currentState.daytime = self.data[row, 1]
         self.currentState.panelProd = self.data[row, 5]
@@ -86,7 +85,7 @@ class Env:
         # self.currentState.price = self.data[row, 3]
         self.currentState.consumption = self.data[row, 4]
 
-    def act(self, action):
+    def step(self, action):
         self.diffProd = self.currentState.panelProd - self.currentState.consumption
         cost = 0.0
         self.currentState.charge = 0.0
@@ -137,19 +136,22 @@ class Env:
 
         if self.diffProd < 0:
             cost -= self.diffProd * self.currentState.price
-        else:
-            cost -= self.diffProd * self.currentState.price / 10
+        # else:
+        #     cost -= self.diffProd * self.currentState.price / 10
 
         # if self.diffProd < -1e-3:
         #     cost = 1.0
 
         row = self.currentState.row + 1
-        self.currentState.daytime = self.data[row, 1]
-        self.currentState.panelProd = self.data[row, 5]
-        # self.currentState.price = self.data[row, 3]
-        self.currentState.price = 1.0
-        self.currentState.consumption = self.data[row, 4]
-        self.currentState.row = row
+        if row >= len(self.data):
+            self.currentState = None
+        else:
+            self.currentState.daytime = self.data[row, 1]
+            self.currentState.panelProd = self.data[row, 5]
+            # self.currentState.price = self.data[row, 3]
+            self.currentState.price = 1.0
+            self.currentState.consumption = self.data[row, 4]
+            self.currentState.row = row
 
         return -cost, self.currentState
 

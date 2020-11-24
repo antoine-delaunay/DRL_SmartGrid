@@ -47,7 +47,7 @@ def strategyAction(strategy, state, DQN_model=None):
 
 
 def test(env: Env, nb_step=3000, DQN_model=None):
-    env.initState(maxNbStep=nb_step)
+    env.reset(nb_step=nb_step)
     initState = copy.deepcopy(env.currentState)
 
     conso, prod, price = [], [], []
@@ -57,7 +57,7 @@ def test(env: Env, nb_step=3000, DQN_model=None):
         actions_qvalue[a] = []
 
     for i in range(nb_step):
-        env.act(ACTIONS[0])
+        env.step(ACTIONS[0])
 
         conso.append(env.currentState.consumption)
         prod.append(env.currentState.panelProd)
@@ -84,13 +84,13 @@ def test(env: Env, nb_step=3000, DQN_model=None):
         env.currentState = copy.deepcopy(initState)
         for i in range(nb_step):
             if strategy == "DQN":
-                q_value = [predict(DQN_model, env.currentState, a) for a in ACTIONS]
+                q_value = predict(DQN_model, env.currentState, ACTIONS)
                 action = ACTIONS[np.argmax(q_value)]
                 for q, a in zip(q_value, ACTIONS):
                     actions_qvalue[a].append(float(q))
             else:
                 action = strategyAction(strategy, env.currentState)
-            reward, next_state = env.act(action)
+            reward, next_state = env.step(action)
 
             cost[strategy].append(-reward)
             actions[strategy].append(action)
