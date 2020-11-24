@@ -51,9 +51,10 @@ def test(env: Env, nb_step=3000, DQN_model=None):
     initState = copy.deepcopy(env.currentState)
 
     conso, prod, price = [], [], []
-    charge_hist = []
-    discharge_hist = []
-    trade_hist = []
+
+    actions_qvalue = {}
+    for a in ACTIONS:
+        actions_qvalue[a] = []
 
     for i in range(nb_step):
         env.act(ACTIONS[0])
@@ -85,9 +86,8 @@ def test(env: Env, nb_step=3000, DQN_model=None):
             if strategy == "DQN":
                 q_value = [predict(DQN_model, env.currentState, a) for a in ACTIONS]
                 action = ACTIONS[np.argmax(q_value)]
-                charge_hist.append(float(q_value[0]))
-                discharge_hist.append(float(q_value[1]))
-                trade_hist.append(float(q_value[2]))
+                for q, a in zip(q_value, ACTIONS):
+                    actions_qvalue[a].append(float(q))
             else:
                 action = strategyAction(strategy, env.currentState)
             reward, next_state = env.act(action)
@@ -136,10 +136,9 @@ def test(env: Env, nb_step=3000, DQN_model=None):
     plt.figure(4)
 
     fig, ax = plt.subplots()
-    ax.plot(charge_hist)
-    ax.plot(discharge_hist)
-    ax.plot(trade_hist)
-    ax.legend(["Charge", "Discharge", "Trade"])
+    for a in ACTIONS:
+        ax.plot(actions_qvalue[a])
+    ax.legend(ACTIONS)
     ax.title.set_text("Q-value")
     plt.figure(5)
 

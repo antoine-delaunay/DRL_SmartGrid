@@ -58,20 +58,17 @@ def policy(model, state):
 
 
 def loss(model, transitions_batch):
-    state_action_list_y = []
-    state_action_list_q = []
-    for state, action, _, next_state in transitions_batch:
-        state_action_list_y.append((next_state, ACTIONS))
-        state_action_list_q.append((state, action))
+    state_action_list_y = [(next_state, ACTIONS) for _, _, _, next_state in transitions_batch]
+    state_action_list_q = [(state, action) for state, action, _, _ in transitions_batch]
 
     batch_comp = predict_list(model, state_action_list_q + state_action_list_y)
     q = tf.reshape(batch_comp[: len(state_action_list_q)], [-1])
     y_precomp = batch_comp[len(state_action_list_q) :]
 
-    y = []
-    for i, (_, _, reward, _) in enumerate(transitions_batch):
-        y.append(reward + GAMMA * np.max(y_precomp[NB_ACTION * i : NB_ACTION * (i + 1)]))
-
+    y = [
+        reward + GAMMA * np.max(y_precomp[NB_ACTION * i : NB_ACTION * (i + 1)])
+        for i, (_, _, reward, _) in enumerate(transitions_batch)
+    ]
     y = tf.convert_to_tensor(y, dtype=tf.float32)
 
     # return tf.reduce_mean(tf.square(q - tf.stop_gradient(y)), name="loss_mse_train")
@@ -105,14 +102,15 @@ def train(
     train_summary_writer = tf.summary.create_file_writer(train_log_dir)
     train_loss = tf.keras.metrics.Mean("train_loss", dtype=tf.float32)
     train_reward = tf.keras.metrics.Mean("train_reward", dtype=tf.float32)
-    train_charge = tf.keras.metrics.Mean("train_charge", dtype=tf.float32)
-    train_discharge = tf.keras.metrics.Mean("train_discharge", dtype=tf.float32)
-    train_trade = tf.keras.metrics.Mean("train_trade", dtype=tf.float32)
+    train_qvalues = {}
+    for a in ACTIONS:
+        train_qvalues[a] = tf.keras.metrics.Mean("train_" + a, dtype=tf.float32)
 
     input_size = DIM_STATE + NB_ACTION
     if model_name and recup_model:
         DQN_model = load("models/" + model_name)
         print("Model loaded")
+        # we have to check if the model loaded has the same input size than the one expected here
     else:
         DQN_model = DQN(n_neurons=n_neurons, input_size=input_size)
 
@@ -158,35 +156,32 @@ def train(
         # Test phase : compute reward
         env.initState(maxNbStep=nb_steps)
         reward_hist = []
-        charge_hist = []
-        discharge_hist = []
-        trade_hist = []
+        actions_qvalue_hist = {}
+        for a in ACTIONS:
+            actions_qvalue_hist[a] = []
+
         for step in range(nb_steps):
             q_value = predict(DQN_model, env.currentState, ACTIONS)
             action = ACTIONS[np.argmax(q_value)]
             reward, _ = env.act(action)
             reward_hist.append(reward)
-            charge_hist.append(q_value[0])
-            discharge_hist.append(q_value[1])
-            trade_hist.append(q_value[2])
+            for q, a in zip(q_value, ACTIONS):
+                actions_qvalue_hist[a].append(q)
 
         train_reward(reward_hist)
-        train_charge(charge_hist)
-        train_discharge(discharge_hist)
-        train_trade(trade_hist)
+        for a in ACTIONS:
+            train_qvalues[a](actions_qvalue_hist[a])
 
         with train_summary_writer.as_default():
             tf.summary.scalar("loss", train_loss.result(), step=i_episode)
             tf.summary.scalar("reward", train_reward.result(), step=i_episode)
-            tf.summary.scalar("Q value : charge", train_charge.result(), step=i_episode)
-            tf.summary.scalar("Q value : discharge", train_discharge.result(), step=i_episode)
-            tf.summary.scalar("Q value : trade", train_trade.result(), step=i_episode)
+            for a in ACTIONS:
+                tf.summary.scalar("Q value : " + a, train_qvalues[a].result(), step=i_episode)
 
         train_loss.reset_states()
         train_reward.reset_states()
-        train_charge.reset_states()
-        train_discharge.reset_states()
-        train_trade.reset_states()
+        for a in ACTIONS:
+            train_qvalues[a].reset_states()
 
         if model_name and (i_episode + 1) % save_step == 0:
             save(DQN_model, model_name)

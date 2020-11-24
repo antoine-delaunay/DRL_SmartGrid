@@ -20,7 +20,7 @@ print("Training...")
 DQN = train(
     envTrain,
     n_neurons=n_neurons,
-    nb_episodes=2000,
+    nb_episodes=200,
     nb_steps=10,
     batch_size=100,
     # model_name=model_name,
