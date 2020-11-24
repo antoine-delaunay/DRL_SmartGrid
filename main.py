@@ -10,20 +10,22 @@ from Analyze import test
 envTrain = Env("Data/select_train_data_30m.csv")
 envTest = Env("Data/select_test_data_30m.csv")
 
-n_neurons = 10
+NB_NEURONS = 10
+NB_EPISODES = 20
+NB_STEPS = 10
+BATCH_SIZE = 50
 
-model_name = datetime.datetime.now().strftime("%Y%m%d-%H%M%S") + f"/NN_{n_neurons}"
-# model_name = f"20201123-230915/NN_{n_neurons}"
-
+model_name = f"{NB_NEURONS}nn_{NB_EPISODES}ep_{NB_STEPS}s_{BATCH_SIZE}b"
 
 print("Training...")
 DQN = train(
     envTrain,
-    n_neurons=n_neurons,
-    nb_episodes=200,
-    nb_steps=10,
-    batch_size=100,
-    # model_name=model_name,
+    n_neurons=NB_NEURONS,
+    nb_episodes=NB_EPISODES,
+    nb_steps=NB_STEPS,
+    batch_size=BATCH_SIZE,
+    model_name=model_name,
+    # save_step=50,
     # recup_model=True,
 )
 print("Done")

@@ -92,13 +92,13 @@ def train(
     nb_steps=50,
     batch_size=100,
     model_name=None,
-    save_step=50,
+    save_step=None,
     recup_model=False,
 ):
     alpha = 0.7
 
     current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    train_log_dir = "logs/" + current_time + "/train"
+    train_log_dir = f"logs/{model_name}_{current_time}/train"
     train_summary_writer = tf.summary.create_file_writer(train_log_dir)
     train_loss = tf.keras.metrics.Mean("train_loss", dtype=tf.float32)
     train_reward = tf.keras.metrics.Mean("train_reward", dtype=tf.float32)
@@ -108,7 +108,7 @@ def train(
 
     input_size = DIM_STATE + NB_ACTION
     if model_name and recup_model:
-        DQN_model = load("models/" + model_name)
+        DQN_model = load(f"models/{model_name}")
         print("Model loaded")
         # we have to check if the model loaded has the same input size than the one expected here
     else:
@@ -119,7 +119,7 @@ def train(
     replay_memory = []
     replay_memory_init_size = 10 * batch_size
 
-    env.initState(maxNbStep=nb_steps)
+    env.initState(maxNbStep=replay_memory_init_size)
     for i in range(replay_memory_init_size):
         action_probs = policy(DQN_model, env.currentState)
         action = np.random.choice(ACTIONS, p=action_probs)
@@ -183,11 +183,11 @@ def train(
         for a in ACTIONS:
             train_qvalues[a].reset_states()
 
-        if model_name and (i_episode + 1) % save_step == 0:
-            save(DQN_model, model_name)
+        if model_name and save_step and (i_episode + 1) % save_step == 0:
+            save(DQN_model, f"models/{model_name}")
             print("Model saved")
 
-    if model_name:
-        save(DQN_model, model_name)
+    if model_name and save_step:
+        save(DQN_model, f"models/{model_name}")
         print("Model saved")
     return DQN_model
