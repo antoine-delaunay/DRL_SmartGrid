@@ -9,8 +9,8 @@ from Env import Env, ACTIONS, State
 
 NB_ACTION = len(ACTIONS)
 DIM_STATE = len(State().toArray())
-EPS = 0.5
-GAMMA = 0.1
+EPS = 0.8
+GAMMA = 0.8
 
 
 def DQN(n_neurons, input_size):
@@ -133,12 +133,10 @@ def train(
             print(i_episode)
 
         # total_reward = 0
-        # reward_hist = []
         for step in range(nb_steps):
             action_probs = policy(DQN_model, env.currentState)
             action = np.random.choice(ACTIONS, p=action_probs)
             reward, next_state = env.act(action)
-            # reward_hist.append(reward)
 
             # if step == 0:
             #     total_reward = reward
@@ -154,22 +152,13 @@ def train(
 
         # Test phase : compute reward
         env.initState(maxNbStep=nb_steps)
-        reward_hist = []
-        actions_qvalue_hist = {}
-        for a in ACTIONS:
-            actions_qvalue_hist[a] = []
-
         for step in range(nb_steps):
             q_value = predict(DQN_model, env.currentState, ACTIONS)
             action = ACTIONS[np.argmax(q_value)]
             reward, _ = env.act(action)
-            reward_hist.append(reward)
+            train_reward(reward)
             for q, a in zip(q_value, ACTIONS):
-                actions_qvalue_hist[a].append(q)
-
-        train_reward(reward_hist)
-        for a in ACTIONS:
-            train_qvalues[a](actions_qvalue_hist[a])
+                train_qvalues[a](q)
 
         with train_summary_writer.as_default():
             tf.summary.scalar("loss", train_loss.result(), step=i_episode)

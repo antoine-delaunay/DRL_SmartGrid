@@ -11,7 +11,7 @@ envTrain = Env("Data/select_train_data_30m_2.csv")
 envTest = Env("Data/select_test_data_30m_2.csv")
 
 NB_NEURONS = 10
-NB_EPISODES = 1000
+NB_EPISODES = 5000
 NB_STEPS = 10
 BATCH_SIZE = 100
 
