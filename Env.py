@@ -28,7 +28,7 @@ class State:
 class Env:
     def __init__(self, dataFile: str):
         # load data (csv)
-        df = pandas.read_csv(dataFile, sep=";", header=0)
+        df = pandas.read_csv(dataFile, sep=",", header=0)
 
         self.data = df.values
 
@@ -113,6 +113,8 @@ class Env:
                 self.currentState.battery += self.currentState.discharge
                 self.diffProd -= self.currentState.discharge * self.dischargingYield
                 # cost += abs(self.currentState.discharge * self.dischargingCost)
+                if self.currentState.discharge < 0:
+                    cost = -1.0
 
         # elif action == "generator":
         #     if self.diffProd < 0:
@@ -141,7 +143,7 @@ class Env:
         # else:
         #     cost -= self.diffProd * self.currentState.price / 10
 
-        if self.diffProd < 0:
+        if self.diffProd < -1e-3:
             cost = 1.0
 
         row = self.currentState.row + 1

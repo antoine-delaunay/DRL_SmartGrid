@@ -7,12 +7,12 @@ from Env import Env
 from Model import train, save, load
 from Analyze import test
 
-envTrain = Env("Data/select_train_data_30m.csv")
-envTest = Env("Data/select_test_data_30m.csv")
+envTrain = Env("Data/select_train_data_30m_2.csv")
+envTest = Env("Data/select_test_data_30m_2.csv")
 
 NB_NEURONS = 10
-NB_EPISODES = 20
-NB_STEPS = 10
+NB_EPISODES = 2000
+NB_STEPS = 50
 BATCH_SIZE = 50
 
 model_name = f"{NB_NEURONS}nn_{NB_EPISODES}ep_{NB_STEPS}s_{BATCH_SIZE}b"
