@@ -75,6 +75,26 @@ def loss(model, transitions_batch):
     return tf.square(q - tf.stop_gradient(y))
 
 
+def loss_double(model_A, model_B, transitions_batch):
+    state_action_list_y = [(next_state, ACTIONS) for _, _, _, next_state in transitions_batch]
+    state_action_list_q = [(state, action) for state, action, _, _ in transitions_batch]
+
+    q = tf.reshape(predict_list(model_A, state_action_list_q), [-1])
+
+    y_q_A = predict_list(model_A, state_action_list_y)
+    state_action_list_model_B = [
+        (next_state, ACTIONS[np.argmax(y_q_A[NB_ACTION * i : NB_ACTION * (i + 1)])])
+        for i, (_, _, _, next_state) in enumerate(transitions_batch)
+    ]
+    y_q_B_batch = predict_list(model_B, state_action_list_model_B)
+
+    y = [reward + GAMMA * q_B for q_B, (_, _, reward, _) in zip(y_q_B_batch, transitions_batch)]
+    y = tf.convert_to_tensor(y, dtype=tf.float32)
+
+    # return tf.reduce_mean(tf.square(q - tf.stop_gradient(y)), name="loss_mse_train")
+    return tf.square(q - tf.stop_gradient(y))
+
+
 def train_step(model, transitions_batch, optimizer):
     with tf.GradientTape() as disc_tape:
         disc_loss = loss(model, transitions_batch)
@@ -83,6 +103,17 @@ def train_step(model, transitions_batch, optimizer):
     gradients = [tf.clip_by_norm(g, 1.0) for g in gradients]
 
     optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+    return disc_loss
+
+
+def train_step_double(model_A, model_B, transitions_batch, optimizer):
+    with tf.GradientTape() as disc_tape:
+        disc_loss = loss_double(model_A, model_B, transitions_batch)
+
+    gradients = disc_tape.gradient(disc_loss, model_A.trainable_variables)
+    gradients = [tf.clip_by_norm(g, 1.0) for g in gradients]
+
+    optimizer.apply_gradients(zip(gradients, model_A.trainable_variables))
     return disc_loss
 
 
@@ -95,6 +126,7 @@ def train(
     model_name=None,
     save_step=None,
     recup_model=False,
+    algo="simple",
 ):
     alpha = 0.7
 
@@ -108,12 +140,16 @@ def train(
         train_qvalues[a] = tf.keras.metrics.Mean("train_" + a, dtype=tf.float32)
 
     input_size = DIM_STATE + NB_ACTION
+    DQN_model = []
     if model_name and recup_model:
-        DQN_model = load(f"models/{model_name}")
+        DQN_model.append(load(f"models/{model_name}"))
         print("Model loaded")
         # we have to check if the model loaded has the same input size than the one expected here
     else:
-        DQN_model = DQN(n_neurons=n_neurons, input_size=input_size)
+        DQN_model.append(DQN(n_neurons=n_neurons, input_size=input_size))
+
+    if algo == "double":
+        DQN_model.append(DQN(n_neurons=n_neurons, input_size=input_size))
 
     optimizer = tf.keras.optimizers.Adam(learning_rate=1e-4)
 
@@ -122,7 +158,7 @@ def train(
 
     env.initState(maxNbStep=replay_memory_init_size)
     for i in range(replay_memory_init_size):
-        action_probs = policy(DQN_model, env.currentState)
+        action_probs = policy(DQN_model[0], env.currentState)
         action = np.random.choice(ACTIONS, p=action_probs)
         reward, next_state = env.act(action)
         replay_memory.append((env.currentState, action, reward, next_state))
@@ -132,9 +168,13 @@ def train(
         if i_episode % 10 == 0:
             print(i_episode)
 
+        if algo == "double":
+            if np.random.rand() > 0.5:
+                DQN_model[0], DQN_model[1] = DQN_model[1], DQN_model[0]
+
         # total_reward = 0
         for step in range(nb_steps):
-            action_probs = policy(DQN_model, env.currentState)
+            action_probs = policy(DQN_model[0], env.currentState)
             action = np.random.choice(ACTIONS, p=action_probs)
             reward, next_state = env.act(action)
 
@@ -147,13 +187,16 @@ def train(
             replay_memory.append((env.currentState, action, reward, next_state))
 
             samples = random.sample(replay_memory, batch_size)
-            loss_step = train_step(DQN_model, samples, optimizer)
+            if algo == "double":
+                loss_step = train_step_double(DQN_model[0], DQN_model[1], samples, optimizer)
+            else:
+                loss_step = train_step(DQN_model[0], samples, optimizer)
             train_loss(loss_step)
 
         # Test phase : compute reward
         env.initState(maxNbStep=nb_steps)
         for step in range(nb_steps):
-            q_value = predict(DQN_model, env.currentState, ACTIONS)
+            q_value = predict(DQN_model[0], env.currentState, ACTIONS)
             action = ACTIONS[np.argmax(q_value)]
             reward, _ = env.act(action)
             train_reward(reward)
@@ -172,10 +215,10 @@ def train(
             train_qvalues[a].reset_states()
 
         if model_name and save_step and (i_episode + 1) % save_step == 0:
-            save(DQN_model, f"models/{model_name}")
+            save(DQN_model[0], f"models/{model_name}")
             print("Model saved")
 
     if model_name and save_step:
-        save(DQN_model, f"models/{model_name}")
+        save(DQN_model[0], f"models/{model_name}")
         print("Model saved")
-    return DQN_model
+    return DQN_model[0]

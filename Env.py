@@ -22,7 +22,8 @@ class State:
 
     def toArray(self):
         # return np.array([self.battery, self.panelProd, self.consumption, self.price, self.daytime,])
-        return np.array([self.battery, self.panelProd, self.consumption, self.price])
+        # return np.array([self.battery, self.panelProd, self.consumption, self.price])
+        return np.array([self.battery, self.panelProd - self.consumption])
 
 
 class Env:
@@ -134,13 +135,13 @@ class Env:
 
         self.currentState.trade = -self.diffProd
 
-        # if self.diffProd < 0:
-        #     cost -= self.diffProd * self.currentState.price
-        # else:
-        #     cost -= self.diffProd * self.currentState.price / 10
+        if self.diffProd < 0:
+            cost -= self.diffProd * self.currentState.price
+        else:
+            cost -= self.diffProd * self.currentState.price / 10
 
-        if self.diffProd < -1e-3:
-            cost = 1.0
+        # if self.diffProd < -1e-3:
+        #     cost = 1.0
 
         row = self.currentState.row + 1
         self.currentState.daytime = self.data[row, 1]
