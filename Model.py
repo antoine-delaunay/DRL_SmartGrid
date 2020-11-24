@@ -10,7 +10,7 @@ from Env import Env, ACTIONS, State
 NB_ACTION = len(ACTIONS)
 DIM_STATE = len(State().toArray())
 EPS = 0.5
-GAMMA = 0.9
+GAMMA = 0.1
 
 
 def DQN(n_neurons, input_size):
@@ -72,7 +72,7 @@ def loss(model, transitions_batch):
     y = tf.convert_to_tensor(y, dtype=tf.float32)
 
     # return tf.reduce_mean(tf.square(q - tf.stop_gradient(y)), name="loss_mse_train")
-    return tf.square(q - y)
+    return tf.square(q - tf.stop_gradient(y))
 
 
 def train_step(model, transitions_batch, optimizer):
@@ -80,6 +80,7 @@ def train_step(model, transitions_batch, optimizer):
         disc_loss = loss(model, transitions_batch)
 
     gradients = disc_tape.gradient(disc_loss, model.trainable_variables)
+    gradients = [tf.clip_by_norm(g, 1.0) for g in gradients]
 
     optimizer.apply_gradients(zip(gradients, model.trainable_variables))
     return disc_loss
@@ -128,7 +129,6 @@ def train(
 
     for i_episode in range(nb_episodes):
         env.initState(maxNbStep=nb_steps)
-        loss_episode = 0.0
         if i_episode % 10 == 0:
             print(i_episode)
 
@@ -149,9 +149,8 @@ def train(
             replay_memory.append((env.currentState, action, reward, next_state))
 
             samples = random.sample(replay_memory, batch_size)
-            loss_episode += train_step(DQN_model, samples, optimizer)
-
-        train_loss(loss_episode)
+            loss_step = train_step(DQN_model, samples, optimizer)
+            train_loss(loss_step)
 
         # Test phase : compute reward
         env.initState(maxNbStep=nb_steps)

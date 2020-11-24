@@ -102,8 +102,6 @@ class Env:
                 self.currentState.battery += self.currentState.charge * self.chargingYield
                 self.diffProd -= self.currentState.charge
                 # cost += self.currentState.charge * self.chargingCost
-                if self.currentState.charge > 0:
-                    cost = -1.0
 
         elif action == "discharge":
             if self.diffProd < 0:
@@ -113,8 +111,6 @@ class Env:
                 self.currentState.battery += self.currentState.discharge
                 self.diffProd -= self.currentState.discharge * self.dischargingYield
                 # cost += abs(self.currentState.discharge * self.dischargingCost)
-                if self.currentState.discharge < 0:
-                    cost = -1.0
 
         # elif action == "generator":
         #     if self.diffProd < 0:
