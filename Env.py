@@ -80,10 +80,15 @@ class Env:
         self.currentState.row = np.random.randint(0, len(self.data) - nb_step)
         row = self.currentState.row
         # self.currentState.daytime = self.data[row, 1]
-        self.currentState.panelProd = self.data[row, 5]
         self.currentState.price = 1.0
         # self.currentState.price = self.data[row, 3]
-        self.currentState.consumption = self.data[row, 4]
+        # self.currentState.consumption = self.data[row, 4]
+        # self.currentState.panelProd = self.data[row, 5]
+
+        # Test
+        theta = 2 * np.pi * np.random.rand()
+        self.currentState.consumption = np.cos(theta)
+        self.currentState.panelProd = np.sin(theta)
 
     def step(self, action):
         self.diffProd = self.currentState.panelProd - self.currentState.consumption
@@ -146,12 +151,19 @@ class Env:
         if row >= len(self.data):
             self.currentState = None
         else:
+            self.currentState.row = row
             self.currentState.daytime = self.data[row, 1]
-            self.currentState.panelProd = self.data[row, 5]
             # self.currentState.price = self.data[row, 3]
             self.currentState.price = 1.0
-            self.currentState.consumption = self.data[row, 4]
-            self.currentState.row = row
+            # self.currentState.consumption = self.data[row, 4]
+            # self.currentState.panelProd = self.data[row, 5]
+
+            # Test
+            angle = np.pi / 4
+            O = np.array([[np.cos(angle), np.sin(angle)], [-np.sin(angle), np.cos(angle)]])
+            self.currentState.consumption, self.currentState.panelProd = O @ np.array(
+                [self.currentState.consumption, self.currentState.panelProd]
+            )
 
         return -cost, self.currentState
 

@@ -127,9 +127,9 @@ def train(
     algo="simple",
     replay_memory_init_size=10000,
     replay_memory_size=100000,
-    update_target_estimator_every=10000,
+    update_target_estimator_every=1000,
     epsilon_start=1.0,
-    epsilon_min=0.1,
+    epsilon_min=1.0,
     epsilon_decay_steps=100000,
 ):
     current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
