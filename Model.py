@@ -9,7 +9,7 @@ from Env import Env, ACTIONS, State
 
 NB_ACTION = len(ACTIONS)
 DIM_STATE = len(State().toArray())
-GAMMA = 0.9
+GAMMA = 0.5
 
 
 def DQN(n_neurons, input_size):
@@ -125,12 +125,12 @@ def train(
     save_step=None,
     recup_model=False,
     algo="simple",
-    replay_memory_init_size=100,
+    replay_memory_init_size=1000,
     replay_memory_size=10000,
-    update_target_estimator_every=32,
-    epsilon_start=1.0,
-    epsilon_min=1.0,
-    epsilon_decay_steps=100000,
+    update_target_estimator_every=200,
+    epsilon_start=0.9,
+    epsilon_min=0.2,
+    epsilon_decay_steps=50000,
 ):
     current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     train_log_dir = f"logs/{model_name}_{current_time}/train"
@@ -176,8 +176,7 @@ def train(
     total_step = 0
     for i_episode in range(nb_episodes):
         env.reset(nb_step=nb_steps)
-        if i_episode % 10 == 0:
-            print(i_episode)
+        print(f"Epoch {i_episode}\tEps {epsilon}")
 
         # Train phase
         if algo == "double":
@@ -215,7 +214,7 @@ def train(
 
             total_step += 1
 
-        epsilon = max(epsilon - d_epsilon, epsilon_min)
+            epsilon = max(epsilon - d_epsilon, epsilon_min)
 
         # Test phase : compute reward
         env.reset(nb_step=nb_steps)

@@ -46,7 +46,7 @@ def strategyAction(strategy, state, DQN_model=None):
             return ACTIONS[1]
 
 
-def test(env: Env, nb_step=3000, DQN_model=None):
+def test(env: Env, nb_step, DQN_model=None):
     env.reset(nb_step=nb_step)
     initState = copy.deepcopy(env.currentState)
 

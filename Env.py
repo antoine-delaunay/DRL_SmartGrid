@@ -2,7 +2,6 @@ import pandas
 import numpy as np
 import datetime
 
-# ACTIONS = ["charge", "discharge", "generator", "discharge + generator", "nothing"]
 ACTIONS = np.array(["charge", "discharge", "trade"])
 
 
@@ -53,7 +52,7 @@ class Env:
 
         # Capacity of the battery and the generator
         self.reset()
-        self.batteryCapacity = 10  # 60000.0 / self.panelProdMax
+        self.batteryCapacity = 2.0  # 60000.0 / self.panelProdMax
         self.generatorCapacity = (
             0.4  # Energie produite par le générateur en 5min 20000.0 / (12 * self.panelProdMax)
         )
@@ -107,6 +106,8 @@ class Env:
                 self.currentState.battery += self.currentState.charge * self.chargingYield
                 self.diffProd -= self.currentState.charge
                 # cost += self.currentState.charge * self.chargingCost
+                if self.currentState.charge > 0:
+                    cost = -1.0
 
         elif action == "discharge":
             if self.diffProd < 0:
@@ -116,6 +117,8 @@ class Env:
                 self.currentState.battery += self.currentState.discharge
                 self.diffProd -= self.currentState.discharge * self.dischargingYield
                 # cost += abs(self.currentState.discharge * self.dischargingCost)
+                if self.currentState.discharge < 0:
+                    cost = -1.0
 
         # elif action == "generator":
         #     if self.diffProd < 0:
@@ -139,8 +142,13 @@ class Env:
 
         self.currentState.trade = -self.diffProd
 
-        if self.diffProd < 0:
-            cost -= self.diffProd * self.currentState.price
+        # cost -= 3 * self.currentState.battery / self.batteryCapacity
+
+        # if self.diffProd < 0:
+        #     cost += 1.0
+
+        # if self.diffProd < 0:
+        #     cost -= self.diffProd * self.currentState.price
         # else:
         #     cost -= self.diffProd * self.currentState.price / 10
 
