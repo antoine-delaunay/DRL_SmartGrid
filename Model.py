@@ -130,7 +130,7 @@ def train(
     update_target_estimator_every=200,
     epsilon_start=0.9,
     epsilon_min=0.2,
-    epsilon_decay_steps=50000,
+    epsilon_decay_steps=30000,
 ):
     current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     train_log_dir = f"logs/{model_name}_{current_time}/train"
@@ -155,7 +155,7 @@ def train(
     if algo == "double":
         DQN_model["Q_estimator_bis"] = DQN(n_neurons=n_neurons, input_size=input_size)
 
-    optimizer = tf.keras.optimizers.Adam(learning_rate=1e-2)
+    optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3)
 
     epsilon = epsilon_start
     d_epsilon = (epsilon_start - epsilon_min) / float(epsilon_decay_steps)

@@ -90,7 +90,7 @@ def test(env: Env, nb_step, DQN_model=None):
                     actions_qvalue[a].append(float(q))
             else:
                 action = strategyAction(strategy, env.currentState)
-            reward, next_state = env.step(action)
+            reward, _ = env.step(action)
 
             cost[strategy].append(-reward)
             actions[strategy].append(action)
