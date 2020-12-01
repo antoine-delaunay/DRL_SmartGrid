@@ -12,11 +12,11 @@ DIM_STATE = len(State().toArray())
 GAMMA = 0.9
 
 
-def DQN(n_neurons, input_size):
+def DQN(n_neurons, input_size, output_size):
     model = tf.keras.Sequential(name="DQN")
     model.add(layers.Dense(n_neurons, input_shape=(input_size,), activation="sigmoid"))
     model.add(layers.Dense(n_neurons, activation="sigmoid"))
-    model.add(layers.Dense(1))
+    model.add(layers.Dense(output_size))
     return model
 
 
@@ -28,63 +28,55 @@ def load(name):
     return tf.keras.models.load_model(name)
 
 
-def predict_list(model, state_action_list):
-    def input_one_action(state, action):
-        input_action = np.zeros(NB_ACTION)
-        input_action[ACTIONS == action] = 1.0
-        return np.concatenate((input_action, state.toArray()))
-
-    input_model = []
-    for state, action in state_action_list:
-        if isinstance(action, (list, np.ndarray)):
-            for a in action:
-                input_model.append(input_one_action(state, a))
-        else:
-            input_model.append(input_one_action(state, action))
-
-    return model(np.array(input_model))
+def predict_array(model, state_list):
+    state_array = np.array([s.toArray() for s in state_list])
+    return model(state_array)
 
 
-def predict(model, state, action):
-    return predict_list(model, [(state, action)])
+def predict(model, state):
+    return predict_array(model, [state])[0]
 
 
 def eps_greedy_policy(model, state, epsilon):
-    q_value = predict(model, state, ACTIONS)
+    q_value = predict(model, state)
     prob = np.ones(NB_ACTION) * epsilon / NB_ACTION
     prob[np.argmax(q_value)] += 1.0 - epsilon
     return prob
 
 
 def loss(model, target_model, transitions_batch):
-    state_action_list_y = [(next_state, ACTIONS) for _, _, _, next_state in transitions_batch]
-    state_action_list_q = [(state, action) for state, action, _, _ in transitions_batch]
+    state_array_y = np.array([next_state for _, _, _, next_state in transitions_batch])
+    state_array_q = np.array([state for state, _, _, _ in transitions_batch])
+    action_array_q = np.array([action for _, action, _, _ in transitions_batch])
 
-    q = tf.reshape(predict_list(model, state_action_list_q), [-1])
+    q_actions = predict_array(model, state_array_q)
+    q = tf.convert_to_tensor([q[ACTIONS == a] for a, q in zip(action_array_q, q_actions)])
 
-    batch_target = predict_list(target_model, state_action_list_y)
+    batch_target = predict_array(target_model, state_array_y)
     y = [
-        reward + GAMMA * np.max(batch_target[NB_ACTION * i : NB_ACTION * (i + 1)])
+        reward + GAMMA * np.max(batch_target[i])
         for i, (_, _, reward, _) in enumerate(transitions_batch)
     ]
     y = tf.convert_to_tensor(y, dtype=tf.float32)
 
-    # return tf.reduce_mean(tf.square(q - tf.stop_gradient(y)), name="loss_mse_train")
-    return tf.square(q - tf.stop_gradient(y))
+    return tf.reduce_mean(tf.square(q - tf.stop_gradient(y)), name="loss_mse_train")
+    # return tf.square(q - tf.stop_gradient(y))
 
 
 def loss_double(model_A, model_B, transitions_batch):
-    state_action_list_y = [(next_state, ACTIONS) for _, _, _, next_state in transitions_batch]
-    state_action_list_q = [(state, action) for state, action, _, _ in transitions_batch]
+    state_array_y = np.array([next_state for _, _, _, next_state in transitions_batch])
+    state_array_q = np.array([state for state, _, _, _ in transitions_batch])
+    action_array_q = np.array([action for _, action, _, _ in transitions_batch])
 
-    q = tf.reshape(predict_list(model_A, state_action_list_q), [-1])
+    q_actions = predict_array(model_A, state_array_q)
+    q = tf.convert_to_tensor([q[ACTIONS == a] for a, q in zip(action_array_q, q_actions)])
 
-    y_q_A = predict_list(model_A, state_action_list_y)
-    state_action_list_model_B = [
-        (next_state, ACTIONS[np.argmax(y_q_A[NB_ACTION * i : NB_ACTION * (i + 1)])])
-        for i, (_, _, _, next_state) in enumerate(transitions_batch)
-    ]
-    y_q_B_batch = predict_list(model_B, state_action_list_model_B)
+    batch_A = predict_array(model_A, state_array_y)
+    batch_B = predict_array(model_B, state_array_y)
+    action_array_B = np.array(
+        [ACTIONS[np.argmax(batch_A[i])] for i, _ in enumerate(transitions_batch)]
+    )
+    y_q_B_batch = tf.convert_to_tensor([b[ACTIONS == a] for a, b in zip(action_array_B, batch_B)])
 
     y = [reward + GAMMA * q_B for q_B, (_, _, reward, _) in zip(y_q_B_batch, transitions_batch)]
     y = tf.convert_to_tensor(y, dtype=tf.float32)
@@ -129,7 +121,7 @@ def train(
     replay_memory_size=10000,
     update_target_estimator_every=32,
     epsilon_start=1.0,
-    epsilon_min=1.0,
+    epsilon_min=0.1,
     epsilon_decay_steps=100000,
 ):
     current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -141,19 +133,26 @@ def train(
     for a in ACTIONS:
         train_qvalues[a] = tf.keras.metrics.Mean("train_" + a, dtype=tf.float32)
 
-    input_size = DIM_STATE + NB_ACTION
+    input_size = DIM_STATE
+    output_size = NB_ACTION
     DQN_model = {}
     if model_name and recup_model:
         DQN_model["Q_estimator"] = load(f"models/{model_name}")
         print("Model loaded")
         # we have to check if the model loaded has the same input size than the one expected here
     else:
-        DQN_model["Q_estimator"] = DQN(n_neurons=n_neurons, input_size=input_size)
+        DQN_model["Q_estimator"] = DQN(
+            n_neurons=n_neurons, input_size=input_size, output_size=output_size
+        )
 
     if algo == "simple":
-        DQN_model["target_estimator"] = DQN(n_neurons=n_neurons, input_size=input_size)
+        DQN_model["target_estimator"] = DQN(
+            n_neurons=n_neurons, input_size=input_size, output_size=output_size
+        )
     if algo == "double":
-        DQN_model["Q_estimator_bis"] = DQN(n_neurons=n_neurons, input_size=input_size)
+        DQN_model["Q_estimator_bis"] = DQN(
+            n_neurons=n_neurons, input_size=input_size, output_size=output_size
+        )
 
     optimizer = tf.keras.optimizers.Adam(learning_rate=1e-2)
 
@@ -220,7 +219,7 @@ def train(
         # Test phase : compute reward
         env.reset(nb_step=nb_steps)
         for step in range(nb_steps):
-            q_value = predict(DQN_model["Q_estimator"], env.currentState, ACTIONS)
+            q_value = predict(DQN_model["Q_estimator"], env.currentState)
             action = ACTIONS[np.argmax(q_value)]
             reward, _ = env.step(action)
             train_reward(reward)
