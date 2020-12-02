@@ -155,7 +155,7 @@ def train(
     if algo == "double":
         DQN_model["Q_estimator_bis"] = DQN(n_neurons=n_neurons, input_size=input_size)
 
-    optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3)
+    optimizer = tf.keras.optimizers.RMSprop(learning_rate=1e-4)
 
     epsilon = epsilon_start
     d_epsilon = (epsilon_start - epsilon_min) / float(epsilon_decay_steps)
