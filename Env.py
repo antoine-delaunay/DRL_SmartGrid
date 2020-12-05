@@ -6,6 +6,10 @@ ACTIONS = np.array(["charge", "discharge", "trade"])
 NB_STEPS_MEMORY = 10
 BATTERY_CAPACITY = 2.0
 
+# Test
+f_c = 5
+f_p = 10
+
 
 class State:
     def __init__(self):
@@ -98,8 +102,6 @@ class Env:
         #     self.currentState.updateMemory()
 
         # Test
-        f_c = 5
-        f_p = 10
         row = np.random.randint(NB_STEPS_MEMORY, 100 + NB_STEPS_MEMORY)
 
         for self.currentState.row in range(row - NB_STEPS_MEMORY, row + 1):
@@ -123,13 +125,14 @@ class Env:
                 )
                 self.currentState.battery += self.currentState.charge * self.chargingYield
                 self.diffProd -= self.currentState.charge
+                cost -= self.currentState.charge * self.currentState.price
                 # cost += self.currentState.charge * self.chargingCost
-                if self.currentState.charge > 1e-5:
-                    cost = -1.0
-                else:
-                    cost = 0.0
-            else:
-                cost = 1.0
+            #     if self.currentState.charge > 1e-5:
+            #         cost = -1.0
+            #     else:
+            #         cost = 0.0
+            # else:
+            #     cost = 1.0
 
         elif action == "discharge":
             if self.diffProd < 0:
@@ -139,21 +142,21 @@ class Env:
                 self.currentState.battery += self.currentState.discharge
                 self.diffProd -= self.currentState.discharge * self.dischargingYield
                 # cost += abs(self.currentState.discharge * self.dischargingCost)
-                if self.currentState.discharge < -1e-5:
-                    if self.diffProd < -1e-5:
-                        cost = 0.25
-                    else:
-                        cost = -1.0
-                else:
-                    cost = 1.0
-            else:
-                cost = 0.0
+                # if self.currentState.discharge < -1e-5:
+                #     if self.diffProd < -1e-5:
+                #         cost = 0.25
+                #     else:
+                #         cost = -1.0
+                # else:
+                #     cost = 1.0
+            # else:
+            #     cost = 0.0
 
-        elif action == "trade":
-            if self.diffProd < 0:
-                cost = 0.5
-            else:
-                cost = 0.0
+        # elif action == "trade":
+        #     if self.diffProd < 0:
+        #         cost = 0.5
+        #     else:
+        #         cost = 0.0
 
         # elif action == "generator":
         #     if self.diffProd < 0:
@@ -179,10 +182,10 @@ class Env:
 
         # cost -= 3 * self.currentState.battery / self.batteryCapacity
 
-        # if self.diffProd < 0:
-        #     cost -= self.diffProd * self.currentState.price
-        # else:
-        #     cost -= self.diffProd * self.currentState.price / 10
+        if self.diffProd < 0:
+            cost -= self.diffProd * self.currentState.price
+        else:
+            cost -= self.diffProd * self.currentState.price / 10
 
         # if self.diffProd < -1e-3:
         #     cost = 1.0
@@ -199,8 +202,6 @@ class Env:
             # self.currentState.panelProd = self.data[row, 5]
 
             # Test
-            f_c = 5
-            f_p = 10
             self.currentState.consumption = np.cos(2 * np.pi * self.currentState.row / f_c)
             self.currentState.panelProd = np.cos(2 * np.pi * self.currentState.row / f_p)
 

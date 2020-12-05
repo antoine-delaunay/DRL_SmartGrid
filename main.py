@@ -4,9 +4,6 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 import datetime
 from Env import Env
-
-# from Model2 import train, save, load
-
 from Model import train, save, load
 from Analyze import test
 
