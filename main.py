@@ -14,17 +14,21 @@ envTrain = Env("Data/select_train_data_30m_2.csv")
 envTest = Env("Data/select_test_data_30m_2.csv")
 
 ALGO = "simple"
-NB_NEURONS = 20
+HIDDEN_LAYERS = [20, 20]
 NB_EPISODES = 5000
 NB_STEPS = 50
 BATCH_SIZE = 100
 
-model_name = f"{ALGO}_{NB_NEURONS}nn_{NB_EPISODES}ep_{NB_STEPS}s_{BATCH_SIZE}b"
+model_name = (
+    f"{ALGO}_"
+    + "-".join(list(map(str, HIDDEN_LAYERS)))
+    + f"nn_{NB_EPISODES}ep_{NB_STEPS}s_{BATCH_SIZE}b"
+)
 
 print("Training...")
 DQN = train(
     envTrain,
-    n_neurons=NB_NEURONS,
+    hidden_layers=HIDDEN_LAYERS,
     nb_episodes=NB_EPISODES,
     nb_steps=NB_STEPS,
     batch_size=BATCH_SIZE,
@@ -35,5 +39,4 @@ DQN = train(
 )
 print("Done")
 
-test(envTrain, nb_step=300, DQN_model=DQN)
 test(envTest, nb_step=300, DQN_model=DQN)

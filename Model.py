@@ -9,14 +9,24 @@ from Env import Env, ACTIONS, State
 
 NB_ACTION = len(ACTIONS)
 DIM_STATE = len(State().toArray())
-GAMMA = 0.5
+GAMMA = 0.8
 
 
-def DQN(n_neurons, input_size):
-    model = tf.keras.Sequential(name="DQN")
-    model.add(layers.Dense(n_neurons, input_shape=(input_size,), activation="sigmoid"))
-    model.add(layers.Dense(n_neurons, activation="sigmoid"))
-    model.add(layers.Dense(1))
+def build_NN(input_size, output_size, hidden_layers=[]):
+    model = tf.keras.Sequential()
+
+    hidden_layers = hidden_layers[:]
+    hidden_layers.append(output_size)
+    input_layer = input_size
+
+    while len(hidden_layers) > 1:
+        output_layer = hidden_layers.pop(0)
+        model.add(layers.Dense(output_layer, input_shape=(input_layer,), activation="sigmoid"))
+        input_layer = output_layer
+
+    output_layer = hidden_layers.pop(0)
+    model.add(layers.Dense(output_layer))
+
     return model
 
 
@@ -69,8 +79,8 @@ def loss(model, target_model, transitions_batch):
     ]
     y = tf.convert_to_tensor(y, dtype=tf.float32)
 
-    # return tf.reduce_mean(tf.square(q - tf.stop_gradient(y)), name="loss_mse_train")
-    return tf.square(q - tf.stop_gradient(y))
+    return tf.reduce_mean(tf.square(q - tf.stop_gradient(y)), name="loss_mse_train")
+    # return tf.square(q - tf.stop_gradient(y))
 
 
 def loss_double(model_A, model_B, transitions_batch):
@@ -80,6 +90,7 @@ def loss_double(model_A, model_B, transitions_batch):
     q = tf.reshape(predict_list(model_A, state_action_list_q), [-1])
 
     y_q_A = predict_list(model_A, state_action_list_y)
+
     state_action_list_model_B = [
         (next_state, ACTIONS[np.argmax(y_q_A[NB_ACTION * i : NB_ACTION * (i + 1)])])
         for i, (_, _, _, next_state) in enumerate(transitions_batch)
@@ -89,8 +100,8 @@ def loss_double(model_A, model_B, transitions_batch):
     y = [reward + GAMMA * q_B for q_B, (_, _, reward, _) in zip(y_q_B_batch, transitions_batch)]
     y = tf.convert_to_tensor(y, dtype=tf.float32)
 
-    # return tf.reduce_mean(tf.square(q - tf.stop_gradient(y)), name="loss_mse_train")
-    return tf.square(q - tf.stop_gradient(y))
+    return tf.reduce_mean(tf.square(q - tf.stop_gradient(y)), name="loss_mse_train")
+    # return tf.square(q - tf.stop_gradient(y))
 
 
 def train_step(model, target_model, transitions_batch, optimizer):
@@ -117,7 +128,7 @@ def train_step_double(model_A, model_B, transitions_batch, optimizer):
 
 def train(
     env: Env,
-    n_neurons,
+    hidden_layers=[],
     nb_episodes=50,
     nb_steps=50,
     batch_size=100,
@@ -126,10 +137,12 @@ def train(
     recup_model=False,
     algo="simple",
     replay_memory_init_size=1000,
-    replay_memory_size=10000,
-    update_target_estimator_every=200,
-    epsilon_start=0.9,
-    epsilon_min=0.2,
+    replay_memory_size=100000,
+    update_target_estimator_init=10,
+    update_target_estimator_max=5000,
+    update_target_estimator_epoch=50,
+    epsilon_start=1.0,
+    epsilon_min=0.4,
     epsilon_decay_steps=30000,
 ):
     current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -148,37 +161,47 @@ def train(
         print("Model loaded")
         # we have to check if the model loaded has the same input size than the one expected here
     else:
-        DQN_model["Q_estimator"] = DQN(n_neurons=n_neurons, input_size=input_size)
+        DQN_model["Q_estimator"] = build_NN(
+            input_size=input_size, output_size=1, hidden_layers=hidden_layers
+        )
 
     if algo == "simple":
-        DQN_model["target_estimator"] = DQN(n_neurons=n_neurons, input_size=input_size)
+        DQN_model["target_estimator"] = build_NN(
+            input_size=input_size, output_size=1, hidden_layers=hidden_layers
+        )
     if algo == "double":
-        DQN_model["Q_estimator_bis"] = DQN(n_neurons=n_neurons, input_size=input_size)
+        DQN_model["Q_estimator_bis"] = build_NN(
+            input_size=input_size, output_size=1, hidden_layers=hidden_layers
+        )
 
-    optimizer = tf.keras.optimizers.RMSprop(learning_rate=1e-4)
+    optimizer = tf.keras.optimizers.RMSprop(learning_rate=1e-5)
 
     epsilon = epsilon_start
     d_epsilon = (epsilon_start - epsilon_min) / float(epsilon_decay_steps)
     replay_memory = []
-    env.reset()
-    for i in range(replay_memory_init_size):
-        next_state = None
-        while next_state is None:
-            action_probs = eps_greedy_policy(DQN_model["Q_estimator"], env.currentState, epsilon)
-            action = np.random.choice(ACTIONS, p=action_probs)
-            reward, next_state = env.step(action)
-            if next_state is not None:
-                break
-            env.reset()
+    # env.reset()
+    # for i in range(replay_memory_init_size):
+    #     next_state = None
+    #     while next_state is None:
+    #         action_probs = eps_greedy_policy(DQN_model["Q_estimator"], env.currentState, epsilon)
+    #         action = np.random.choice(ACTIONS, p=action_probs)
+    #         reward, next_state = env.step(action)
+    #         if next_state is not None:
+    #             break
+    #         env.reset()
 
-        replay_memory.append((env.currentState, action, reward, next_state))
+    #     replay_memory.append((env.currentState, action, reward, next_state))
 
+    update_target_estimator = update_target_estimator_init
     total_step = 0
     for i_episode in range(nb_episodes):
         env.reset(nb_step=nb_steps)
-        print(f"Epoch {i_episode}\tEps {epsilon}")
+        print(f"epoch {i_episode}\teps {epsilon}\ttarget_update {update_target_estimator}")
 
         # Train phase
+        if (i_episode + 1) % 50 == 0:
+            update_target_estimator = min(5 * update_target_estimator, update_target_estimator_max)
+
         if algo == "double":
             if np.random.rand() > 0.5:
                 DQN_model["Q_estimator"], DQN_model["Q_estimator_bis"] = (
@@ -188,12 +211,15 @@ def train(
 
         for step in range(nb_steps):
             if algo == "simple":
-                if total_step % update_target_estimator_every == 0:
+                if total_step % update_target_estimator == 0:
                     DQN_model["target_estimator"].set_weights(
                         DQN_model["Q_estimator"].get_weights()
                     )
+                    print("Target estimator updated")
 
-            action_probs = eps_greedy_policy(DQN_model["Q_estimator"], env.currentState, epsilon)
+            action_probs = eps_greedy_policy(
+                DQN_model["Q_estimator"], env.currentState, epsilon * np.random.rand()
+            )
             action = np.random.choice(ACTIONS, p=action_probs)
             reward, next_state = env.step(action)
 
@@ -201,7 +227,7 @@ def train(
                 replay_memory.pop(0)
             replay_memory.append((env.currentState, action, reward, next_state))
 
-            samples = random.sample(replay_memory, batch_size)
+            samples = random.sample(replay_memory, min(batch_size, len(replay_memory)))
             if algo == "simple":
                 loss_step = train_step(
                     DQN_model["Q_estimator"], DQN_model["target_estimator"], samples, optimizer

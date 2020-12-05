@@ -22,7 +22,13 @@ class State:
     def toArray(self):
         # return np.array([self.battery, self.panelProd, self.consumption, self.price, self.daytime,])
         # return np.array([self.battery, self.panelProd, self.consumption, self.price])
-        return np.array([self.battery, self.panelProd - self.consumption])
+        # return np.array([self.battery, self.panelProd - self.consumption])
+        return np.array(
+            [
+                1.0 if self.battery > 1.9 else 0.0,
+                1.0 if self.panelProd - self.consumption > 0 else -1.0,
+            ]
+        )
 
 
 class Env:
@@ -81,13 +87,13 @@ class Env:
         # self.currentState.daytime = self.data[row, 1]
         self.currentState.price = 1.0
         # self.currentState.price = self.data[row, 3]
-        # self.currentState.consumption = self.data[row, 4]
-        # self.currentState.panelProd = self.data[row, 5]
+        self.currentState.consumption = self.data[row, 4]
+        self.currentState.panelProd = self.data[row, 5]
 
         # Test
-        theta = 2 * np.pi * np.random.rand()
-        self.currentState.consumption = np.cos(theta)
-        self.currentState.panelProd = np.sin(theta)
+        # theta = 2 * np.pi * np.random.rand()
+        # self.currentState.consumption = np.cos(theta)
+        # self.currentState.panelProd = np.sin(theta)
 
     def step(self, action):
         self.diffProd = self.currentState.panelProd - self.currentState.consumption
@@ -108,6 +114,7 @@ class Env:
                 # cost += self.currentState.charge * self.chargingCost
                 if self.currentState.charge > 0:
                     cost = -1.0
+                    # cost = -self.currentState.charge
 
         elif action == "discharge":
             if self.diffProd < 0:
@@ -119,6 +126,7 @@ class Env:
                 # cost += abs(self.currentState.discharge * self.dischargingCost)
                 if self.currentState.discharge < 0:
                     cost = -1.0
+                    # cost = self.currentState.discharge
 
         # elif action == "generator":
         #     if self.diffProd < 0:
@@ -163,15 +171,15 @@ class Env:
             self.currentState.daytime = self.data[row, 1]
             # self.currentState.price = self.data[row, 3]
             self.currentState.price = 1.0
-            # self.currentState.consumption = self.data[row, 4]
-            # self.currentState.panelProd = self.data[row, 5]
+            self.currentState.consumption = self.data[row, 4]
+            self.currentState.panelProd = self.data[row, 5]
 
             # Test
-            angle = np.pi / 4
-            O = np.array([[np.cos(angle), np.sin(angle)], [-np.sin(angle), np.cos(angle)]])
-            self.currentState.consumption, self.currentState.panelProd = O @ np.array(
-                [self.currentState.consumption, self.currentState.panelProd]
-            )
+            # angle = np.pi / 4
+            # O = np.array([[np.cos(angle), np.sin(angle)], [-np.sin(angle), np.cos(angle)]])
+            # self.currentState.consumption, self.currentState.panelProd = O @ np.array(
+            #     [self.currentState.consumption, self.currentState.panelProd]
+            # )
 
         return -cost, self.currentState
 
