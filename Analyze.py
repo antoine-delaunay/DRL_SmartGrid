@@ -2,18 +2,19 @@ import numpy as np
 import matplotlib.pyplot as plt
 import copy
 
-from Env import Env, ACTIONS
+from Env import Env, ACTIONS, BATTERY_CAPACITY
 from Model import predict
 
 """
 Strategies supported :
     - DQN
     - Random
-    - Nothing
+    - Trade
     - RandomBattery    # random charge/discharge
     - SmartBattery
+    - SmartBattery2
 """
-STRATEGIES = ["DQN", "Random", "Nothing", "RandomBattery", "SmartBattery"]
+STRATEGIES = ["DQN", "Random", "Trade", "RandomBattery", "SmartBattery", "SmartBattery2"]
 
 
 def strategyAction(strategy, state, DQN_model=None):
@@ -33,7 +34,7 @@ def strategyAction(strategy, state, DQN_model=None):
     if strategy == "Random":
         return np.random.choice(ACTIONS)
 
-    if strategy == "Nothing":
+    if strategy == "Trade":
         return ACTIONS[-1]
 
     if strategy == "RandomBattery":
@@ -42,6 +43,14 @@ def strategyAction(strategy, state, DQN_model=None):
     if strategy == "SmartBattery":
         if state.panelProd > state.consumption:
             return ACTIONS[0]
+        else:
+            return ACTIONS[1]
+
+    if strategy == "SmartBattery2":
+        if state.panelProd > state.consumption and state.battery < BATTERY_CAPACITY * 0.9999:
+            return ACTIONS[0]
+        elif state.panelProd > state.consumption:
+            return ACTIONS[2]
         else:
             return ACTIONS[1]
 

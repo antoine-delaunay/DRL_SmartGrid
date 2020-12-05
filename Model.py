@@ -174,7 +174,7 @@ def train(
             input_size=input_size, output_size=1, hidden_layers=hidden_layers
         )
 
-    optimizer = tf.keras.optimizers.RMSprop(learning_rate=1e-5)
+    optimizer = tf.keras.optimizers.RMSprop(learning_rate=3e-5)
 
     epsilon = epsilon_start
     d_epsilon = (epsilon_start - epsilon_min) / float(epsilon_decay_steps)

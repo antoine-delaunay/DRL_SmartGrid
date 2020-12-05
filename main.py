@@ -14,7 +14,7 @@ envTrain = Env("Data/select_train_data_30m_2.csv")
 envTest = Env("Data/select_test_data_30m_2.csv")
 
 ALGO = "simple"
-HIDDEN_LAYERS = [20, 20]
+HIDDEN_LAYERS = [50, 20]
 NB_EPISODES = 5000
 NB_STEPS = 50
 BATCH_SIZE = 100
