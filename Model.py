@@ -13,6 +13,22 @@ GAMMA = 0.95
 
 
 def build_NN(input_size, output_size, hidden_layers=[]):
+    """ 
+    Builds a sequential neural network.
+    The shapes are defined by the parameters.
+    The activation function used is the sigmoid.
+
+    Parameters: 
+    input_size (int)
+
+    output_size (int)
+
+    hidden_layers (list)
+
+    Returns: 
+    model: a neural network built with TensorFlow 2
+
+    """
     model = tf.keras.Sequential()
 
     hidden_layers = hidden_layers[:]
@@ -31,14 +47,47 @@ def build_NN(input_size, output_size, hidden_layers=[]):
 
 
 def save(model, name):
+    """ 
+    Saves the model in a folder named name.
+
+    Parameters: 
+    model: a TensorFlow 2 model
+
+    name (str): name of the model
+
+    """
     model.save(name)
 
 
 def load(name):
+    """ 
+    Loads a TensorFlow 2 model from a folder named name
+
+    Parameters: 
+    name (str): name of the model
+
+    Returns: 
+    model: a neural network built with TensorFlow 2
+
+    """
     return tf.keras.models.load_model(name)
 
 
 def predict_list(model, state_action_list):
+    """ 
+    Returns the Q-values predicted by the model and associated to the pairs (state, action)
+    in the list state_action_list.
+
+    Parameters: 
+    model: a neural network built with TensorFlow 2
+
+    state_action_list (list): list of pairs (state, action) 
+
+    Returns: 
+    Q_values (tf.Tensor): Q_values predicted by the model
+
+    """
+
     def input_one_action(state, action):
         input_action = np.zeros(NB_ACTION)
         input_action[ACTIONS == action] = 1.0
@@ -56,10 +105,38 @@ def predict_list(model, state_action_list):
 
 
 def predict(model, state, action):
+    """ 
+    Returns the Q-value predicted by the model for the pair (state, action).
+
+    Parameters: 
+    model: a neural network built with TensorFlow 2
+
+    state (State)
+
+    action (str) 
+
+    Returns: 
+    Q_value (tf.Tensor): Q_value predicted by the model
+
+    """
     return predict_list(model, [(state, action)])
 
 
 def eps_greedy_policy(model, state, epsilon):
+    """ 
+    Returns the probability array associated to the epsilon greedy policy.
+
+    Parameters: 
+    model: a neural network built with TensorFlow 2
+
+    state (State)
+
+    espilon (float)
+
+    Returns: 
+    prob (np.array): probability array
+
+    """
     q_value = predict(model, state, ACTIONS)
     prob = np.ones(NB_ACTION) * epsilon / NB_ACTION
     prob[np.argmax(q_value)] += 1.0 - epsilon
@@ -67,6 +144,22 @@ def eps_greedy_policy(model, state, epsilon):
 
 
 def loss(model, target_model, transitions_batch):
+    """ 
+    Computes the loss of the model according to the predictions of the model and
+    the target model on the transitions_batch. The loss computed is the one associated to 
+    the DQN algorithm with a target estimator.
+
+    Parameters: 
+    model: a neural network built with TensorFlow 2
+
+    target_model: a neural network built with TensorFlow 2
+
+    transitions_batch (list): list of tuples (state, action, reward, next_state) 
+
+    Returns: 
+    loss (tf.Tensor)
+
+    """
     state_action_list_y = [(next_state, ACTIONS) for _, _, _, next_state in transitions_batch]
     state_action_list_q = [(state, action) for state, action, _, _ in transitions_batch]
 
@@ -84,6 +177,22 @@ def loss(model, target_model, transitions_batch):
 
 
 def loss_double(model_A, model_B, transitions_batch):
+    """ 
+    Computes the loss of the model_A according to the predictions of the model_A and
+    the model_B on the transitions_batch. The loss computed is the one associated to 
+    the double DQN algorithm.
+
+    Parameters: 
+    model: a neural network built with TensorFlow 2
+
+    target_model: a neural network built with TensorFlow 2
+
+    transitions_batch (list): list of tuples (state, action, reward, next_state) 
+
+    Returns: 
+    loss (tf.Tensor)
+
+    """
     state_action_list_y = [(next_state, ACTIONS) for _, _, _, next_state in transitions_batch]
     state_action_list_q = [(state, action) for state, action, _, _ in transitions_batch]
 
@@ -105,6 +214,23 @@ def loss_double(model_A, model_B, transitions_batch):
 
 
 def train_step(model, target_model, transitions_batch, optimizer):
+    """ 
+    Trains the model on the transitions_batch using the target_model and the parameters defined
+    in the optimizer. This is the training associated to the DQN algorithm with a target model.
+
+    Parameters: 
+    model: a neural network built with TensorFlow 2
+
+    target_model: a neural network built with TensorFlow 2
+
+    transitions_batch (list): list of tuples (state, action, reward, next_state) 
+
+    optimizer: an optimizer instantiated with TensorFlow 2
+
+    Returns: 
+    loss (tf.Tensor)
+
+    """
     with tf.GradientTape() as disc_tape:
         disc_loss = loss(model, target_model, transitions_batch)
 
@@ -116,6 +242,23 @@ def train_step(model, target_model, transitions_batch, optimizer):
 
 
 def train_step_double(model_A, model_B, transitions_batch, optimizer):
+    """ 
+    Trains the model_A on the transitions_batch using the model_B and the parameters defined
+    in the optimizer. This is the training associated to the Double DQN algorithm.
+
+    Parameters: 
+    model_A: a neural network built with TensorFlow 2
+
+    model_B: a neural network built with TensorFlow 2
+
+    transitions_batch (list): list of tuples (state, action, reward, next_state) 
+
+    optimizer: an optimizer instantiated with TensorFlow 2
+
+    Returns: 
+    loss (tf.Tensor)
+
+    """
     with tf.GradientTape() as disc_tape:
         disc_loss = loss_double(model_A, model_B, transitions_batch)
 
@@ -133,7 +276,7 @@ def train(
     nb_steps=50,
     batch_size=100,
     model_name=None,
-    save_step=None,
+    save_episode=None,
     recup_model=False,
     algo="simple",
     replay_memory_init_size=1000,
@@ -145,6 +288,65 @@ def train(
     epsilon_min=0.4,
     epsilon_decay_steps=30000,
 ):
+    """ 
+    Builds and trains a model using a DQN algorithm.
+
+    Parameters: 
+    env: the environnement on which the model is trained
+
+    hidden_layers: a list containing the number of neurons per hidden layer.
+    The numbers of neurons at input and output are automatically deduced
+    from the provided environment.
+
+    nb_episodes: number of training episodes. An episode corresponds to a
+    contiguous sequence of steps in the environment.
+    
+    nb_steps: number of steps per episode. A step corresponds to a call to
+    the step function in the environment and to a training on a batch of the
+    replay memory.
+
+    batch_size: number of steps of the replay memory on which the network is
+    trained for each new step generated.
+
+    model_name: name of the model. This parameter characterizes the name of
+    the saved model and the name that is displayed in TensorBoard.
+    
+    save_episode: the model is saved every save_episode episode. If this
+    parameter is set to None then the template is not saved at all.
+    
+    recup_model: boolean defining whether or not to load a `model_name` model
+    in the saves.
+    
+    algo: This parameter has two possible values: "single" or "double". It
+    defines the algorithm to use. The first one corresponds to the classical
+    DQN algorithm, while the second one corresponds to the double DQN algorithm.
+    
+    replay_memory_init_size: initial size of the replay_memory.
+
+    replay_memory_size: maximal/final size of the replay_memory.
+
+    update_target_estimator_init: initial period of time during which the
+    target estimator is not updated.
+    
+    update_target_estimator_max: maximum/final time period during which the
+    target estimator is not updated.
+    
+    update_target_estimator_epoch: the update_target_estimator variable begins
+    at update_target_estimator_init and ends at update_target_estimator_max.
+    update_target_estimator_epoch determines the number of episodes to be done
+    before increasing update_target_estimator.
+    
+    epsilon_start: initial value of the epsilon parameter in the DQN algorithm.
+    
+    epsilon_min: final value of the `epsilon` parameter in the DQN algorithm.
+
+    epsilon_decay_steps: number of steps for epsilon to progress from
+    epsilon_start to epsilon_min.
+
+    Returns: 
+    model: a neural network built with TensorFlow 2 and trained
+
+    """
     current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     train_log_dir = f"logs/{model_name}_{current_time}/train"
     train_summary_writer = tf.summary.create_file_writer(train_log_dir)
@@ -174,7 +376,7 @@ def train(
             input_size=input_size, output_size=1, hidden_layers=hidden_layers
         )
 
-    optimizer = tf.keras.optimizers.RMSprop(learning_rate=1e-4)
+    optimizer = tf.keras.optimizers.RMSprop(learning_rate=1e-5)
 
     epsilon = epsilon_start
     d_epsilon = (epsilon_start - epsilon_min) / float(epsilon_decay_steps)
@@ -199,7 +401,7 @@ def train(
         print(f"epoch {i_episode}\teps {epsilon}\ttarget_update {update_target_estimator}")
 
         # Train phase
-        if (i_episode + 1) % 50 == 0:
+        if (i_episode + 1) % update_target_estimator_epoch == 0:
             update_target_estimator = min(5 * update_target_estimator, update_target_estimator_max)
 
         if algo == "double":
@@ -263,11 +465,11 @@ def train(
         for a in ACTIONS:
             train_qvalues[a].reset_states()
 
-        if model_name and save_step and (i_episode + 1) % save_step == 0:
+        if model_name and save_episode and (i_episode + 1) % save_episode == 0:
             save(DQN_model["Q_estimator"], f"models/{model_name}")
             print("Model saved")
 
-    if model_name and save_step:
+    if model_name and save_episode:
         save(DQN_model["Q_estimator"], f"models/{model_name}")
         print("Model saved")
     return DQN_model["Q_estimator"]

@@ -18,18 +18,25 @@ STRATEGIES = ["DQN", "Random", "Trade", "RandomBattery", "SmartBattery", "SmartB
 
 
 def strategyAction(strategy, state, DQN_model=None):
+    """ 
+    Determines the action of the given strategy on the state.
+
+    Parameters: 
+    strategy (str): strategy to use
+
+    state (State): current State of the environment
+
+    Returns: 
+    action (str): action of the strategy given the state.
+
+    """
     if strategy == "DQN":
         if DQN_model is None:
             print("No DQN model given in the function strategyAction")
             return ACTIONS[0]
 
-        # Deterministic
         q_value = [predict(DQN_model, state, a) for a in ACTIONS]
         return ACTIONS[np.argmax(q_value)]
-
-        # Stochastic
-        # action_probs = policy(DQN_model, env.currentState)
-        # return np.random.choice(ACTIONS, p=action_probs)
 
     if strategy == "Random":
         return np.random.choice(ACTIONS)
@@ -56,6 +63,20 @@ def strategyAction(strategy, state, DQN_model=None):
 
 
 def test(env: Env, nb_step, DQN_model=None):
+    """ 
+    Displays figures to compare the result of the DQN algorithm to other predefined strategies.
+
+    Parameters: 
+    env (Env): environment on which the strategies are tested
+
+    nb_step (int): number of steps on which to evaluate strategies
+
+    DQN_model: the model returned by the DQN algorithm.
+    If this parameter is set to None, then only the predefined strategies are tested.
+    This is useful to check the environment.
+
+    """
+
     env.reset(nb_step=nb_step)
     initState = copy.deepcopy(env.currentState)
 
@@ -113,9 +134,7 @@ def test(env: Env, nb_step, DQN_model=None):
     fig, axs = plt.subplots(len(strategies_list))
     for i, s in enumerate(strategies_list):
         axs[i].plot(trade[s])
-        # axs[i].plot(generate[s])
         axs[i].plot(battery[s])
-        # axs[i].legend(["Trade", "Generator", "Battery"])
         axs[i].legend(["Trade", "Battery"])
         axs[i].title.set_text(s)
     plt.figure(1)

@@ -12,7 +12,7 @@ envTest = Env("Data/select_test_data_30m_2.csv")
 
 ALGO = "simple"
 HIDDEN_LAYERS = [50, 20]
-NB_EPISODES = 5000
+NB_EPISODES = 2000
 NB_STEPS = 50
 BATCH_SIZE = 100
 
@@ -31,7 +31,7 @@ DQN = train(
     batch_size=BATCH_SIZE,
     model_name=model_name,
     algo=ALGO,
-    # save_step=200,
+    # save_episode=200,
     # recup_model=True,
 )
 print("Done")
