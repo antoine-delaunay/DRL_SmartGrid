@@ -1,6 +1,7 @@
 import numpy as np
 import random
 import datetime
+import copy
 import tensorflow as tf
 from tensorflow.keras import layers, activations
 from tensorflow.keras.utils import plot_model
@@ -9,7 +10,7 @@ from Env import Env, ACTIONS, State
 
 NB_ACTION = len(ACTIONS)
 DIM_STATE = len(State().toArray())
-GAMMA = 0.95
+GAMMA = 0.5
 
 
 def build_NN(input_size, output_size, hidden_layers=[]):
@@ -160,15 +161,15 @@ def loss(model, target_model, transitions_batch):
     loss (tf.Tensor)
 
     """
-    state_action_list_y = [(next_state, ACTIONS) for _, _, _, next_state in transitions_batch]
-    state_action_list_q = [(state, action) for state, action, _, _ in transitions_batch]
+    state_action_list_y = [(next_state, ACTIONS) for _, _, _, next_state, _ in transitions_batch]
+    state_action_list_q = [(state, action) for state, action, _, _, _ in transitions_batch]
 
     q = tf.reshape(predict_list(model, state_action_list_q), [-1])
 
     batch_target = predict_list(target_model, state_action_list_y)
     y = [
-        reward + GAMMA * np.max(batch_target[NB_ACTION * i : NB_ACTION * (i + 1)])
-        for i, (_, _, reward, _) in enumerate(transitions_batch)
+        reward + GAMMA ** k * np.max(batch_target[NB_ACTION * i : NB_ACTION * (i + 1)])
+        for i, (_, _, reward, _, k) in enumerate(transitions_batch)
     ]
     y = tf.convert_to_tensor(y, dtype=tf.float32)
 
@@ -193,8 +194,8 @@ def loss_double(model_A, model_B, transitions_batch):
     loss (tf.Tensor)
 
     """
-    state_action_list_y = [(next_state, ACTIONS) for _, _, _, next_state in transitions_batch]
-    state_action_list_q = [(state, action) for state, action, _, _ in transitions_batch]
+    state_action_list_y = [(next_state, ACTIONS) for _, _, _, next_state, _ in transitions_batch]
+    state_action_list_q = [(state, action) for state, action, _, _, _ in transitions_batch]
 
     q = tf.reshape(predict_list(model_A, state_action_list_q), [-1])
 
@@ -202,11 +203,14 @@ def loss_double(model_A, model_B, transitions_batch):
 
     state_action_list_model_B = [
         (next_state, ACTIONS[np.argmax(y_q_A[NB_ACTION * i : NB_ACTION * (i + 1)])])
-        for i, (_, _, _, next_state) in enumerate(transitions_batch)
+        for i, (_, _, _, next_state, _) in enumerate(transitions_batch)
     ]
     y_q_B_batch = predict_list(model_B, state_action_list_model_B)
 
-    y = [reward + GAMMA * q_B for q_B, (_, _, reward, _) in zip(y_q_B_batch, transitions_batch)]
+    y = [
+        reward + GAMMA ** k * q_B
+        for q_B, (_, _, reward, _, k) in zip(y_q_B_batch, transitions_batch)
+    ]
     y = tf.convert_to_tensor(y, dtype=tf.float32)
 
     return tf.reduce_mean(tf.square(q - tf.stop_gradient(y)), name="loss_mse_train")
@@ -279,6 +283,7 @@ def train(
     save_episode=None,
     recup_model=False,
     algo="simple",
+    y_method="monte_carlo",
     replay_memory_init_size=1000,
     replay_memory_size=100000,
     update_target_estimator_init=10,
@@ -317,9 +322,12 @@ def train(
     recup_model: boolean defining whether or not to load a `model_name` model
     in the saves.
     
-    algo: This parameter has two possible values: "single" or "double". It
+    algo: this parameter has two possible values: "single" or "double". It
     defines the algorithm to use. The first one corresponds to the classical
     DQN algorithm, while the second one corresponds to the double DQN algorithm.
+
+    y_method: this parameter has two possible values: "monte_carlo" or "td". It
+    defines the method to use to produce the y-value.
     
     replay_memory_init_size: initial size of the replay_memory.
 
@@ -376,7 +384,7 @@ def train(
             input_size=input_size, output_size=1, hidden_layers=hidden_layers
         )
 
-    optimizer = tf.keras.optimizers.RMSprop(learning_rate=1e-5)
+    optimizer = tf.keras.optimizers.RMSprop(learning_rate=1e-4)
 
     epsilon = epsilon_start
     d_epsilon = (epsilon_start - epsilon_min) / float(epsilon_decay_steps)
@@ -387,7 +395,7 @@ def train(
     #     while next_state is None:
     #         action_probs = eps_greedy_policy(DQN_model["Q_estimator"], env.currentState, epsilon)
     #         action = np.random.choice(ACTIONS, p=action_probs)
-    #         reward, next_state = env.step(action)
+    #         reward, next_state, _ = env.step(action)
     #         if next_state is not None:
     #             break
     #         env.reset()
@@ -411,6 +419,12 @@ def train(
                     DQN_model["Q_estimator"],
                 )
 
+        if y_method == "monte_carlo":
+            state_list = []
+            action_list = []
+            reward_list = []
+            last_state = None
+
         for step in range(nb_steps):
             if algo == "simple":
                 if total_step % update_target_estimator == 0:
@@ -423,33 +437,58 @@ def train(
                 DQN_model["Q_estimator"], env.currentState, epsilon * np.random.rand()
             )
             action = np.random.choice(ACTIONS, p=action_probs)
-            reward, next_state = env.step(action)
+            reward, next_state, _ = env.step(action)
 
-            if len(replay_memory) == replay_memory_size:
-                replay_memory.pop(0)
-            replay_memory.append((env.currentState, action, reward, next_state))
+            if y_method == "td":
+                if len(replay_memory) == replay_memory_size:
+                    replay_memory.pop(0)
+                replay_memory.append((env.currentState, action, reward, next_state, 1))
 
-            samples = random.sample(replay_memory, min(batch_size, len(replay_memory)))
-            if algo == "simple":
-                loss_step = train_step(
-                    DQN_model["Q_estimator"], DQN_model["target_estimator"], samples, optimizer
-                )
-            if algo == "double":
-                loss_step = train_step_double(
-                    DQN_model["Q_estimator"], DQN_model["Q_estimator_bis"], samples, optimizer
-                )
-            train_loss(loss_step)
+            if y_method == "monte_carlo":
+                state_list.append(copy.deepcopy(env.currentState))
+                action_list.append(action)
+                reward_list.append(reward)
+                last_state = copy.deepcopy(next_state)
+
+            if len(replay_memory) > 0:
+                samples = random.sample(replay_memory, min(batch_size, len(replay_memory)))
+                if algo == "simple":
+                    loss_step = train_step(
+                        DQN_model["Q_estimator"], DQN_model["target_estimator"], samples, optimizer
+                    )
+                if algo == "double":
+                    loss_step = train_step_double(
+                        DQN_model["Q_estimator"], DQN_model["Q_estimator_bis"], samples, optimizer
+                    )
+                train_loss(loss_step)
 
             total_step += 1
 
             epsilon = max(epsilon - d_epsilon, epsilon_min)
+
+        if y_method == "monte_carlo":
+            if len(replay_memory) == replay_memory_size:
+                replay_memory = replay_memory[nb_steps:]
+
+            gamma_power = [GAMMA ** i for i in range(nb_steps)]
+            for i, (state, action) in enumerate(zip(state_list, action_list)):
+                gamma_power_i = gamma_power[:-i] if i > 0 else gamma_power
+                replay_memory.append(
+                    (
+                        state,
+                        action,
+                        np.sum(np.multiply(reward_list[i:], gamma_power_i)),
+                        last_state,
+                        nb_steps - i,
+                    )
+                )
 
         # Test phase : compute reward
         env.reset(nb_step=nb_steps)
         for step in range(nb_steps):
             q_value = predict(DQN_model["Q_estimator"], env.currentState, ACTIONS)
             action = ACTIONS[np.argmax(q_value)]
-            reward, _ = env.step(action)
+            reward, _, _ = env.step(action)
             train_reward(reward)
             for q, a in zip(q_value, ACTIONS):
                 train_qvalues[a](q)

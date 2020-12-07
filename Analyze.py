@@ -61,7 +61,7 @@ def strategyAction(strategy, state, DQN_model=None):
         if state.panelProd > state.consumption and state.battery < BATTERY_CAPACITY * 0.9999:
             return ACTIONS[0]
         elif state.panelProd > state.consumption:
-            return ACTIONS[2]
+            return ACTIONS[-1]
         else:
             return ACTIONS[1]
 
@@ -124,9 +124,9 @@ def test(env: Env, nb_step, DQN_model=None):
                     actions_qvalue[a].append(float(q))
             else:
                 action = strategyAction(strategy, env.currentState)
-            reward, _ = env.step(action)
+            _, _, step_cost = env.step(action)
 
-            cost[strategy].append(-reward)
+            cost[strategy].append(step_cost)
             actions[strategy].append(action)
             battery[strategy].append(env.currentState.battery)
 
