@@ -8,13 +8,14 @@ from Model import predict
 """
 Strategies supported :
     - DQN
+    - Nothing
     - Random
     - Trade
     - RandomBattery    # random charge/discharge
     - SmartBattery
     - SmartBattery2
 """
-STRATEGIES = ["DQN", "Random", "Trade", "RandomBattery", "SmartBattery", "SmartBattery2"]
+STRATEGIES = ["Random", "Nothing", "Trade", "RandomBattery", "SmartBattery", "SmartBattery2", "DQN"]
 
 
 def strategyAction(strategy, state, DQN_model=None):
@@ -43,6 +44,9 @@ def strategyAction(strategy, state, DQN_model=None):
 
     if strategy == "Trade":
         return ACTIONS[-1]
+
+    if strategy == "Nothing":
+        return ACTIONS[-2]
 
     if strategy == "RandomBattery":
         return np.random.choice(ACTIONS[0:2])

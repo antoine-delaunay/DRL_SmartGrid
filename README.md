@@ -34,7 +34,7 @@ L'environnement lié au SmartGrid est situé dans ce fichier. On y trouve notamm
 
 Les actions possibles sont également définies dans ce fichier. Celles-ci sont :
 
-- Trade : les surplus et carence d'électricité sont échangés sur la marché. La batterie n'est pas impliquée ici.
+- Trade : les surplus et carence d'électricité sont échangés sur le marché. La batterie n'est pas impliquée ici.
 - Charge : s'il y a un surplus de production d'électricité, alors on charge la batterie avec.
 - Discharge : si la consommation est supérieure à la production, alors on essaie d'utiliser l'énergie présente dans la batterie pour compenser.
 

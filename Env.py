@@ -2,7 +2,7 @@ import pandas
 import numpy as np
 import datetime
 
-ACTIONS = np.array(["charge", "discharge", "trade"])
+ACTIONS = np.array(["charge", "discharge", "nothing", "trade"])
 NB_STEPS_MEMORY = 10
 BATTERY_CAPACITY = 10.0
 
@@ -109,22 +109,22 @@ class Env:
     
         """
         self.currentState = State()
-        row = np.random.randint(NB_STEPS_MEMORY, len(self.data) - nb_step)
-        for self.currentState.row in range(row - NB_STEPS_MEMORY, row + 1):
-            # self.currentState.daytime = self.data[self.currentState.row, 1]
-            self.currentState.price = 1.0
-            # self.currentState.price = self.data[self.currentState.row, 3]
-            self.currentState.consumption = self.data[self.currentState.row, 4]
-            self.currentState.panelProd = self.data[self.currentState.row, 5]
-            self.currentState.updateMemory()
+        # row = np.random.randint(NB_STEPS_MEMORY, len(self.data) - nb_step)
+        # for self.currentState.row in range(row - NB_STEPS_MEMORY, row + 1):
+        #     # self.currentState.daytime = self.data[self.currentState.row, 1]
+        #     self.currentState.price = 1.0
+        #     # self.currentState.price = self.data[self.currentState.row, 3]
+        #     self.currentState.consumption = self.data[self.currentState.row, 4]
+        #     self.currentState.panelProd = self.data[self.currentState.row, 5]
+        #     self.currentState.updateMemory()
 
         # Test
-        # row = np.random.randint(NB_STEPS_MEMORY, 100 + NB_STEPS_MEMORY)
+        row = np.random.randint(NB_STEPS_MEMORY, 100 + NB_STEPS_MEMORY)
 
-        # for self.currentState.row in range(row - NB_STEPS_MEMORY, row + 1):
-        #     self.currentState.consumption = np.cos(2 * np.pi * self.currentState.row / f_c)
-        #     self.currentState.panelProd = np.cos(2 * np.pi * self.currentState.row / f_p)
-        #     self.currentState.updateMemory()
+        for self.currentState.row in range(row - NB_STEPS_MEMORY, row + 1):
+            self.currentState.consumption = np.cos(2 * np.pi * self.currentState.row / f_c)
+            self.currentState.panelProd = np.cos(2 * np.pi * self.currentState.row / f_p)
+            self.currentState.updateMemory()
 
     def step(self, action):
         """ 
@@ -165,6 +165,10 @@ class Env:
                 self.currentState.battery += self.currentState.discharge
                 self.diffProd -= self.currentState.discharge * self.dischargingYield
 
+        elif action == "nothing":
+            if self.diffProd < 0:
+                cost += 10.0
+
         # elif action == "generator":
         #     if self.diffProd < 0:
         #         self.currentState.generate = min(-self.diffProd, self.generatorCapacity)
@@ -200,12 +204,12 @@ class Env:
             self.currentState.daytime = self.data[row, 1]
             # self.currentState.price = self.data[row, 3]
             self.currentState.price = 1.0
-            self.currentState.consumption = self.data[row, 4]
-            self.currentState.panelProd = self.data[row, 5]
+            # self.currentState.consumption = self.data[row, 4]
+            # self.currentState.panelProd = self.data[row, 5]
 
             # Test
-            # self.currentState.consumption = np.cos(2 * np.pi * self.currentState.row / f_c)
-            # self.currentState.panelProd = np.cos(2 * np.pi * self.currentState.row / f_p)
+            self.currentState.consumption = np.cos(2 * np.pi * self.currentState.row / f_c)
+            self.currentState.panelProd = np.cos(2 * np.pi * self.currentState.row / f_p)
 
             self.currentState.updateMemory()
 

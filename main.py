@@ -4,7 +4,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 import datetime
 from Env import Env
-from Model import train, save, load
+from Model_MC import train, save, load
 from Analyze import test
 
 envTrain = Env("Data/select_train_data_30m_2.csv")
@@ -12,7 +12,7 @@ envTest = Env("Data/select_test_data_30m_2.csv")
 
 ALGO = "simple"
 HIDDEN_LAYERS = [50, 20]
-NB_EPISODES = 2000
+NB_EPISODES = 20
 NB_STEPS = 50
 BATCH_SIZE = 100
 
