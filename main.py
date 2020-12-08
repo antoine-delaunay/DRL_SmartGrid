@@ -25,6 +25,7 @@ model_name = (
 print("Training...")
 DQN = train(
     envTrain,
+    envTest,
     hidden_layers=HIDDEN_LAYERS,
     nb_episodes=NB_EPISODES,
     nb_steps=NB_STEPS,

@@ -114,8 +114,8 @@ class Env:
         row = np.random.randint(NB_STEPS_MEMORY, len(self.data) - nb_step)
         for self.currentState.row in range(row - NB_STEPS_MEMORY, row + 1):
             # self.currentState.daytime = self.data[self.currentState.row, 1]
-            self.currentState.price = 1.0
-            # self.currentState.price = self.data[self.currentState.row, 3]
+            # self.currentState.price = 1.0
+            self.currentState.price = self.data[self.currentState.row, 3]
             self.currentState.consumption = self.data[self.currentState.row, 4]
             self.currentState.panelProd = self.data[self.currentState.row, 5]
             self.currentState.updateMemory()
@@ -213,8 +213,8 @@ class Env:
         else:
             self.currentState.row = row
             self.currentState.daytime = self.data[row, 1]
-            self.currentState.price = 1.0
-            # self.currentState.price = self.data[row, 3]
+            # self.currentState.price = 1.0
+            self.currentState.price = self.data[row, 3]
             self.currentState.consumption = self.data[row, 4]
             self.currentState.panelProd = self.data[row, 5]
 

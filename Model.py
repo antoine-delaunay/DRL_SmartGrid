@@ -274,7 +274,8 @@ def train_step_double(model_A, model_B, transitions_batch, optimizer):
 
 
 def train(
-    env: Env,
+    envTrain: Env,
+    envTest: Env,
     hidden_layers=[],
     nb_episodes=50,
     nb_steps=50,
@@ -297,7 +298,9 @@ def train(
     Builds and trains a model using a DQN algorithm.
 
     Parameters: 
-    env: the environnement on which the model is trained
+    envTrain: the environnement on which the model is trained
+
+    envTest: the environnement on which the model is tested
 
     hidden_layers: a list containing the number of neurons per hidden layer.
     The numbers of neurons at input and output are automatically deduced
@@ -389,23 +392,23 @@ def train(
     epsilon = epsilon_start
     d_epsilon = (epsilon_start - epsilon_min) / float(epsilon_decay_steps)
     replay_memory = []
-    # env.reset()
+    # envTrain.reset()
     # for i in range(replay_memory_init_size):
     #     next_state = None
     #     while next_state is None:
-    #         action_probs = eps_greedy_policy(DQN_model["Q_estimator"], env.currentState, epsilon)
+    #         action_probs = eps_greedy_policy(DQN_model["Q_estimator"], envTrain.currentState, epsilon)
     #         action = np.random.choice(ACTIONS, p=action_probs)
-    #         reward, next_state, _ = env.step(action)
+    #         reward, next_state, _ = envTrain.step(action)
     #         if next_state is not None:
     #             break
-    #         env.reset()
+    #         envTrain.reset()
 
-    #     replay_memory.append((env.currentState, action, reward, next_state))
+    #     replay_memory.append((envTrain.currentState, action, reward, next_state))
 
     update_target_estimator = update_target_estimator_init
     total_step = 0
     for i_episode in range(nb_episodes):
-        env.reset(nb_step=nb_steps)
+        envTrain.reset(nb_step=nb_steps)
         print(f"epoch {i_episode}\teps {epsilon}\ttarget_update {update_target_estimator}")
 
         # Train phase
@@ -434,18 +437,18 @@ def train(
                     print("Target estimator updated")
 
             action_probs = eps_greedy_policy(
-                DQN_model["Q_estimator"], env.currentState, epsilon * np.random.rand()
+                DQN_model["Q_estimator"], envTrain.currentState, epsilon * np.random.rand()
             )
             action = np.random.choice(ACTIONS, p=action_probs)
-            reward, next_state, _ = env.step(action)
+            reward, next_state, _ = envTrain.step(action)
 
             if y_method == "td":
                 if len(replay_memory) == replay_memory_size:
                     replay_memory.pop(0)
-                replay_memory.append((env.currentState, action, reward, next_state, 1))
+                replay_memory.append((envTrain.currentState, action, reward, next_state, 1))
 
             if y_method == "monte_carlo":
-                state_list.append(copy.deepcopy(env.currentState))
+                state_list.append(copy.deepcopy(envTrain.currentState))
                 action_list.append(action)
                 reward_list.append(reward)
                 last_state = copy.deepcopy(next_state)
@@ -484,11 +487,11 @@ def train(
                 )
 
         # Test phase : compute reward
-        env.reset(nb_step=nb_steps)
+        envTest.reset(nb_step=nb_steps)
         for step in range(nb_steps):
-            q_value = predict(DQN_model["Q_estimator"], env.currentState, ACTIONS)
+            q_value = predict(DQN_model["Q_estimator"], envTest.currentState, ACTIONS)
             action = ACTIONS[np.argmax(q_value)]
-            reward, _, _ = env.step(action)
+            reward, _, _ = envTest.step(action)
             train_reward(reward)
             for q, a in zip(q_value, ACTIONS):
                 train_qvalues[a](q)
