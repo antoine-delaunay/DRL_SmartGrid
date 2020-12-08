@@ -7,8 +7,8 @@ NB_STEPS_MEMORY = 10
 BATTERY_CAPACITY = 2.0
 
 # Test
-f_c = 5
-f_p = 10
+T_c = 5
+T_p = 10
 
 
 class State:
@@ -49,7 +49,9 @@ class State:
         np.array:  state of the environment
     
         """
-        return np.array([self.battery] + self.panelProdMemory + self.consumptionMemory)
+        return np.array(
+            [self.battery] + self.panelProdMemory + self.consumptionMemory + self.priceMemory
+        )
 
 
 class Env:
@@ -101,7 +103,7 @@ class Env:
 
     def reset(self, nb_step=0):
         """ 
-        Reset randomly the current state of the environment.
+        Resets randomly the current state of the environment.
     
         Parameters: 
         nb_step (int): maximum number of steps expected after the call to this function.
@@ -112,8 +114,8 @@ class Env:
         row = np.random.randint(NB_STEPS_MEMORY, len(self.data) - nb_step)
         for self.currentState.row in range(row - NB_STEPS_MEMORY, row + 1):
             # self.currentState.daytime = self.data[self.currentState.row, 1]
-            # self.currentState.price = 1.0
-            self.currentState.price = self.data[self.currentState.row, 3]
+            self.currentState.price = 1.0
+            # self.currentState.price = self.data[self.currentState.row, 3]
             self.currentState.consumption = self.data[self.currentState.row, 4]
             self.currentState.panelProd = self.data[self.currentState.row, 5]
             self.currentState.updateMemory()
@@ -122,8 +124,8 @@ class Env:
         # row = np.random.randint(NB_STEPS_MEMORY, 100 + NB_STEPS_MEMORY)
 
         # for self.currentState.row in range(row - NB_STEPS_MEMORY, row + 1):
-        #     self.currentState.consumption = np.cos(2 * np.pi * self.currentState.row / f_c)
-        #     self.currentState.panelProd = np.cos(2 * np.pi * self.currentState.row / f_p)
+        #     self.currentState.consumption = np.cos(2 * np.pi * self.currentState.row / T_c)
+        #     self.currentState.panelProd = np.cos(2 * np.pi * self.currentState.row / T_p)
         #     self.currentState.updateMemory()
 
     def step(self, action):
@@ -143,8 +145,8 @@ class Env:
         """
 
         self.diffProd = self.currentState.panelProd - self.currentState.consumption
+        reward = 0.0
         cost = 0.0
-        trade_cost = 0.0
         self.currentState.charge = 0.0
         self.currentState.discharge = 0.0
         self.currentState.generate = 0.0
@@ -158,7 +160,7 @@ class Env:
                 )
                 self.currentState.battery += self.currentState.charge * self.chargingYield
                 self.diffProd -= self.currentState.charge
-                cost -= self.currentState.charge * self.currentState.price
+                reward += self.currentState.charge * self.currentState.price
 
         elif action == "discharge":
             if self.diffProd < 0:
@@ -170,11 +172,11 @@ class Env:
 
         elif action == "nothing":
             if self.diffProd < 0:
-                cost += 10.0
+                reward -= 10.0
 
-        elif action == "trade":
-            if self.diffProd > 0:
-                trade_cost -= self.diffProd * self.currentState.price / 10
+        # elif action == "trade":
+        #     if self.diffProd > 0:
+        #         cost -= self.diffProd * self.currentState.price / 10
 
         # elif action == "generator":
         #     if self.diffProd < 0:
@@ -199,9 +201,11 @@ class Env:
         self.currentState.trade = -self.diffProd
 
         if self.diffProd < 0:
-            trade_cost -= self.diffProd * self.currentState.price
+            cost -= self.diffProd * self.currentState.price
+        else:
+            cost -= self.diffProd * self.currentState.price / 10
 
-        cost += trade_cost
+        reward -= cost
 
         row = self.currentState.row + 1
         if row >= len(self.data):
@@ -209,18 +213,18 @@ class Env:
         else:
             self.currentState.row = row
             self.currentState.daytime = self.data[row, 1]
-            # self.currentState.price = 1.0
-            self.currentState.price = self.data[row, 3]
+            self.currentState.price = 1.0
+            # self.currentState.price = self.data[row, 3]
             self.currentState.consumption = self.data[row, 4]
             self.currentState.panelProd = self.data[row, 5]
 
             # Test
-            # self.currentState.consumption = np.cos(2 * np.pi * self.currentState.row / f_c)
-            # self.currentState.panelProd = np.cos(2 * np.pi * self.currentState.row / f_p)
+            # self.currentState.consumption = np.cos(2 * np.pi * self.currentState.row / T_c)
+            # self.currentState.panelProd = np.cos(2 * np.pi * self.currentState.row / T_p)
 
             self.currentState.updateMemory()
 
-        return -cost, self.currentState, trade_cost
+        return reward, self.currentState, cost
 
     def getState(self):
         """ 
